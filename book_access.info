@@ -1,0 +1,4 @@
+name = Book Access
+description = Allows books to be set private
+dependencies = book
+package = Access control

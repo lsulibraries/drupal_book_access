@@ -1,0 +1,44 @@
+<?php
+// $Id$
+
+function book_access_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE IF NOT EXISTS {book_access} (
+        nid int(10) NOT NULL default 0,
+        rid int(10) NOT NULL default 0,
+        grant_view tinyint(1) unsigned NOT NULL default '0',
+        grant_update tinyint(1) unsigned NOT NULL default '0',
+        grant_delete tinyint(1) unsigned NOT NULL default '0',
+        grant_create tinyint(1) unsigned NOT NULL default '0',
+        KEY tid (tid),
+        KEY rid (rid)
+      );");
+      break;
+
+    case 'pgsql':
+      db_query("CREATE TABLE {book_access} (
+        nid int NOT NULL DEFAULT 0,
+        rid int NOT NULL DEFAULT 0,
+        grant_view smallint NOT NULL DEFAULT 0,
+        grant_update smallint  NOT NULL DEFAULT 0,
+        grant_delete smallint NOT NULL DEFAULT 0,
+        grant_create smallint NOT NULL DEFAULT 0,
+        PRIMARY KEY (tid, rid)
+      );");
+      break;
+
+  }
+
+  db_query("UPDATE {system} SET weight = 2 WHERE name = 'book_access'");
+
+  drupal_set_message("book_access database tables created.");
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function book_access_uninstall() {
+  db_query('DROP TABLE {book_access}');
+}
