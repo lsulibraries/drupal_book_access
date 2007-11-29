@@ -9,9 +9,6 @@
  * Based on forum_access.module and tac_lite.module
  *
  * TODO:
- *  - disabling of options in admin/content/book/access could look prettier or
- *    eliminated if there's a better way to handle conflicts. Right now it seems
- *    like these conflicts are generally ignored and admin has to track them down.
  *  -
  *  -
  *  -
@@ -28,42 +25,32 @@ function book_access_help($section) {
         <p>Configure access control per book based on user roles. Settings
         affect all pages within the given book. If a page is moved into a
         different book, it will assume that book\'s access control settings.</p>
-        <p>Disabled settings result from conflicts with the book modules access
-        settings. See !book_access_help for more information.</p>
-        ',  array(
-              '!book_access_help' => l(t('Book Access help'), 'admin/help/book_access'),
-              '!book_access_settings' => l(t('Book Access settings'), 'admin/content/book/access'),
-            )
+        <p>These settings will have no effect for roles with "administer nodes"
+        permission.</p>
+        <p>For more information, see the !book_access_help page.</p>
+      ',  array(
+            '!book_access_help' => l(t('Book Access help'), 'admin/help/book_access'),
+            '!book_access_settings' => l(t('Book Access settings'), 'admin/content/book/access'),
+          )
       );
       break;
     case 'admin/help#book_access':
       return t('
-        <p>Allows fine grained access control for Drupal books.</p>
-        <p>Certain core access settings provided by book can conflict with access control
-        provided by this module. Where a conflict exists, the corresponding settings will be
-        disabled on the !book_access_settings page.<p>
-        <p>To allow the Book access module to control various settings, you may
-        have to disable certain book permissions in the standard
-        !access_settings page.<p>
-        <p>Requirements are as follows:</p>
-        <blockquote>
-        <dt>View this book</dt><dd>no conflicts</dd>
-        <dt>Create pages in book</dt><dd>Disable: "create book pages"</dd>
-        <dt>Edit pages in book</dt><dd>Disable: "edit book pages"</dd>
-        <dt>Delete pages in book</dt><dd>Disable: "edit book pages"</dd>
-        </blockquote>
-        <p>The following book module access settings have no impact on Book
-        access settings: "create new books", "edit own pages", "edit own books",
-        outline posts in books", "see printer-friendly version".</p>
-        <p>Similarly, other access control modules can also impact functionality
-        of this module. Broad reaching modules such as "taxonomy access" and
-        "content access" can override the values set in the
-        !book_access_settings page. You must turn off all enabled access
-        controls in such modules.
+        <p>Allows fine grained access control for books.</p>
+        <p>Permissions enabled in !access_control_settings will override
+        !book_access_settings. So, for example, if you would like a role to be
+        able to edit all book pages, regardless, enable "edit pages" in
+        !access_control_settings. However, if you would like to control edit
+        permission on a per book basis, disable that permission in
+        !access_control_settings and configure !book_access_settings
+        accordingly.
+        <p>Certain access control modules can impact functionality of this
+        module. Broad reaching modules such as "taxonomy access" and "content
+        access" can override the values set in the !book_access_settings page.
+        You must turn off all enabled access controls in such modules.
         ', array(
-              '!book_access_help' => l(t('Book Access help'), 'admin/help/book_access'),
-              '!book_access_settings' => l(t('Book Access settings'), 'admin/content/book/access'),
-              '!access_settings' => l(t('Access settings'), 'admin/user/access'),
+              '!book_access_settings' => l(t('book access settings'), 'admin/content/book/access'),
+              '!access_control_settings' => l(t('access control settings'), 'admin/user/access'),
             )
 
       );
@@ -179,7 +166,6 @@ function book_access_admin_form() {
     $view   = array();
     $update = array();
     $delete = array();
-    $create = array();
 
     $result = db_query("SELECT * FROM {book_access} where nid = %d", $book_nid);
 
@@ -188,7 +174,6 @@ function book_access_admin_form() {
       $view   = array(1, 2);
       $update = array();
       $delete = array();
-      $create = array();
     }
     else {
       while ($book_access = db_fetch_object($result)) {
@@ -201,18 +186,8 @@ function book_access_admin_form() {
         if ($book_access->grant_delete) {
           $delete[] = $book_access->rid;
         }
-        if ($book_access->grant_create) {
-          $create[] = $book_access->rid;
-        }
       }
     }
-
-    // standard access control settings for the book module will conflict with
-    // our settings, so we need to know which settings are currently being used
-    // and notify the admin and disable our control of those settings until
-    // conflicts have been resolved
-    // TODO: is there a better way to handle these conflicts?
-    $enabled_perms = _book_access_get_enabled_permissions();
 
     $form['#tree'] = TRUE;
 
@@ -230,62 +205,20 @@ function book_access_admin_form() {
       '#title'         => t('View this book'),
       '#default_value' => $view
     );
-
-    //if ($enabled_perms['create book pages'] == TRUE) {
-    //  $form['access'][$book_nid]['create'] = array(
-    //    '#type'          => 'markup',
-    //    '#prefix'        => '<div class="book-access-div">',
-    //    '#suffix'        => '</div>',
-    //    '#title'         => t('View this book'),
-    //    '#value'         => '<p>' . t('Create pages in this book: Disabled') . '</p>',
-    //  );
-    //}
-    //else {
-      $form['access'][$book_nid]['create'] = array(
-        '#type'          => 'checkboxes',
-        '#prefix'        => '<div class="book-access-div">',
-        '#suffix'        => '</div>',
-        '#options'       => $rids,
-        '#title'         => t('Create pages in this book'),
-        '#default_value' => $create
-      );
-    //}
-
-    if ($enabled_perms['edit book pages'] == TRUE) {
-      $form['access'][$book_nid]['update'] = array(
-        '#type'          => 'markup',
-        '#prefix'        => '<div class="book-access-div">',
-        '#suffix'        => '</div>',
-        '#value'         => '<p>' . t('Edit pages in this book: Disabled') . '</p>',
-      );
-    }
-    else {
-      $form['access'][$book_nid]['update'] = array('#type' => 'checkboxes',
-        '#prefix'        => '<div class="book-access-div">',
-        '#suffix'        => '</div>',
-        '#options'       => $rids,
-        '#title'         => t('Edit pages in this book'),
-        '#default_value' => $update
-      );
-    }
-
-    if ($enabled_perms['edit book pages'] == TRUE) {
-      $form['access'][$book_nid]['delete'] = array(
-        '#type'          => 'markup',
-        '#prefix'        => '<div class="book-access-div">',
-        '#suffix'        => '</div>',
-        '#value'         => '<p>' . t('Delete pages in this book: Disabled') . '</p>',
-      );
-    }
-    else {
-      $form['access'][$book_nid]['delete'] = array('#type' => 'checkboxes',
-        '#prefix'        => '<div class="book-access-div">',
-        '#suffix'        => '</div>',
-        '#options'       => $rids,
-        '#title'         => t('Delete pages in this book'),
-        '#default_value' => $delete
-      );
-    }
+    $form['access'][$book_nid]['update'] = array('#type' => 'checkboxes',
+      '#prefix'        => '<div class="book-access-div">',
+      '#suffix'        => '</div>',
+      '#options'       => $rids,
+      '#title'         => t('Edit pages in this book'),
+      '#default_value' => $update
+    );
+    $form['access'][$book_nid]['delete'] = array('#type' => 'checkboxes',
+      '#prefix'        => '<div class="book-access-div">',
+      '#suffix'        => '</div>',
+      '#options'       => $rids,
+      '#title'         => t('Delete pages in this book'),
+      '#default_value' => $delete
+    );
   }
 
   $form['clearer'] = array(
@@ -312,16 +245,15 @@ function book_access_admin_form_submit($form_id, $form_values) {
     foreach ($form['view'] as $rid => $checked) {
       $gid = $rid;
       $grant_view = (bool) $checked;
-      $grant_create = $form['create'][$rid] > 0 ? TRUE : FALSE;
       $grant_update = $form['update'][$rid] > 0 ? TRUE : FALSE;
       $grant_delete = $form['delete'][$rid] > 0 ? TRUE : FALSE;
 
       $sql = "
-        INSERT INTO {book_access} (nid, rid, grant_view, grant_update, grant_delete, grant_create)
-        VALUES (%d, %d, %d, %d, %d, %d)
+        INSERT INTO {book_access} (nid, rid, grant_view, grant_update, grant_delete)
+        VALUES (%d, %d, %d, %d, %d)
       ";
 
-      db_query($sql, $book_nid, $rid, $grant_view, $grant_update, $grant_delete, $grant_create);
+      db_query($sql, $book_nid, $rid, $grant_view, $grant_update, $grant_delete);
     }
   }
   node_access_rebuild();
@@ -413,25 +345,4 @@ function _book_access_get_book_nid($nid) {
   else {
     return _book_access_get_book_nid($parents[$nid]);
   }
-}
-
-/**
- * Returns an array of permissions that are enabled for one or more roles
- */
-function _book_access_get_enabled_permissions() {
-  $enabled_perms = array();
-
-  $sql = "
-    SELECT perm
-    FROM {permission}
-  ";
-  $results = db_query($sql);
-  while ($result = db_fetch_array($results)) {
-    $perms = split(', ', $result['perm']);
-    foreach ($perms as $perm) {
-      $enabled_perms[$perm] = TRUE;
-    }
-  }
-
-  return $enabled_perms;
 }
