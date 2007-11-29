@@ -8,6 +8,14 @@
  *
  * Based on forum_access.module and tac_lite.module
  *
+ * TODO:
+ *  - disabling of options in admin/content/book/access could look prettier or
+ *    eliminated if there's a better way to handle conflicts. Right now it seems
+ *    like these conflicts are generally ignored and admin has to track them down.
+ *  -
+ *  -
+ *  -
+ *
  */
 
 /**
@@ -103,7 +111,7 @@ function book_access_node_grants($user, $op) {
 }
 
 /**
- * Implementation of hook_node_access_records
+ * Implementation of hook_node_access_records().
  *
  * Returns a list of grant records for the passed in book node object. If we
  * have a book child page, we return the access settings of the top level parent.
@@ -203,6 +211,7 @@ function book_access_admin_form() {
     // our settings, so we need to know which settings are currently being used
     // and notify the admin and disable our control of those settings until
     // conflicts have been resolved
+    // TODO: is there a better way to handle these conflicts?
     $enabled_perms = _book_access_get_enabled_permissions();
 
     $form['#tree'] = TRUE;
@@ -222,16 +231,16 @@ function book_access_admin_form() {
       '#default_value' => $view
     );
 
-    if ($enabled_perms['create book pages'] == TRUE) {
-      $form['access'][$book_nid]['create'] = array(
-        '#type'          => 'markup',
-        '#prefix'        => '<div class="book-access-div">',
-        '#suffix'        => '</div>',
-        '#title'         => t('View this book'),
-        '#value'         => '<p>' . t('Edit pages in this book: Disabled') . '</p>',
-      );
-    }
-    else {
+    //if ($enabled_perms['create book pages'] == TRUE) {
+    //  $form['access'][$book_nid]['create'] = array(
+    //    '#type'          => 'markup',
+    //    '#prefix'        => '<div class="book-access-div">',
+    //    '#suffix'        => '</div>',
+    //    '#title'         => t('View this book'),
+    //    '#value'         => '<p>' . t('Create pages in this book: Disabled') . '</p>',
+    //  );
+    //}
+    //else {
       $form['access'][$book_nid]['create'] = array(
         '#type'          => 'checkboxes',
         '#prefix'        => '<div class="book-access-div">',
@@ -240,7 +249,7 @@ function book_access_admin_form() {
         '#title'         => t('Create pages in this book'),
         '#default_value' => $create
       );
-    }
+    //}
 
     if ($enabled_perms['edit book pages'] == TRUE) {
       $form['access'][$book_nid]['update'] = array(
@@ -261,7 +270,7 @@ function book_access_admin_form() {
     }
 
     if ($enabled_perms['edit book pages'] == TRUE) {
-      $form['access'][$book_nid]['update'] = array(
+      $form['access'][$book_nid]['delete'] = array(
         '#type'          => 'markup',
         '#prefix'        => '<div class="book-access-div">',
         '#suffix'        => '</div>',
@@ -282,10 +291,14 @@ function book_access_admin_form() {
   $form['clearer'] = array(
     '#value' => '<div class="book-access-clearer"></div>',
   );
-
   $form['submit'] = array(
-    '#type' => 'submit',
+    '#type'  => 'submit',
     '#value' => t('Submit'),
+  );
+  $form['notice'] = array(
+    '#type'  => 'markup',
+    '#value' => '<p>' . t('Node access tables must be rebuilt when these changes are
+      submitted. This may take a few moments.') . '</p>',
   );
 
   return $form;
@@ -315,10 +328,10 @@ function book_access_admin_form_submit($form_id, $form_values) {
 }
 
 /**
- * This is also required by ACL module.
+ * Helper function.
  */
 function book_access_enabled($set = NULL) {
-  static $enabled = true;
+  static $enabled = TRUE;
   if ($set !== NULL) {
     $enabled = $set;
   }
@@ -326,14 +339,14 @@ function book_access_enabled($set = NULL) {
 }
 
 /**
- * Implementation of hook_enable
+ * Implementation of hook_enable().
  */
 function book_access_enable() {
   node_access_rebuild();
 }
 
 /**
- * Implementation of hook_disable
+ * Implementation of hook_disable().
  */
 function book_access_disable() {
   book_access_enabled(FALSE);
@@ -341,8 +354,13 @@ function book_access_disable() {
 }
 
 /**
- * use hook init to deny access to books if the user does not have access
+ * Implementation of hook_init().
+ *
+ * use hook init to deny access to book if the user does not have access
  * to it.
+ *
+ * TODO: harry - this is from forum_access, not sure why it's needed. is it
+ * possible to generate content while bypassing the normal access checks?
  */
 function book_access_init() {
   if (!function_exists('user_access')) {

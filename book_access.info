@@ -1,4 +1,4 @@
 name = Book Access
-description = Allows books to be set private
+description = Allows role-based access control per individual book
 dependencies = book
 package = Access control
