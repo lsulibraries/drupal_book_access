@@ -286,31 +286,6 @@ function book_access_disable() {
 }
 
 /**
- * Implementation of hook_init().
- *
- * use hook init to deny access to book if the user does not have access
- * to it.
- *
- * TODO: harry - this is from forum_access, not sure why it's needed. is it
- * possible to generate content while bypassing the normal access checks?
- */
-function book_access_init() {
-  if (!function_exists('user_access')) {
-    // page is cached; bail.
-    return;
-  }
-
-  if (!user_access('administer books') && arg(0) == 'book' && is_numeric(arg(1))) {
-    global $user;
-    if (!book_access_access(arg(1), 'view')) {
-      drupal_access_denied();
-      module_invoke_all('exit');
-      exit;
-    }
-  }
-}
-
-/**
  * Return array of book nodes and their parents.
  */
 function _book_access_get_parents() {
