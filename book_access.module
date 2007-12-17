@@ -8,10 +8,6 @@
  *
  * Based on forum_access.module and tac_lite.module
  *
- * TODO:
- *  -
- *  -
- *  -
  *
  */
 
@@ -131,7 +127,6 @@ function book_access_node_access_records($node) {
     return $grants;
   }
 }
-
 
 /**
  * Implementation of hook_form_alter().
