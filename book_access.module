@@ -25,11 +25,16 @@ function book_access_help($section) {
         <p>Configure access control per book based on user roles. Settings
         affect all pages within the given book. If a page is moved into a
         different book, it will assume that book\'s access control settings.</p>
+        <p><em>Important:</em> If you are going to manage access control here,
+        please disable the "edit book pages" and "edit own book pages"
+        permissions in the !access_control page or else you may see unexpected
+        behavior.</p>
         <p>These settings will have no effect for roles with "administer nodes"
         permission.</p>
         <p>For more information, see the !book_access_help page.</p>
       ',  array(
             '!book_access_help' => l(t('Book Access help'), 'admin/help/book_access'),
+            '!access_control' => l(t('Access Control'), 'admin/user/access'),
             '!book_access_settings' => l(t('Book Access settings'), 'admin/content/book/access'),
           )
       );
@@ -124,6 +129,17 @@ function book_access_node_access_records($node) {
     }
 
     return $grants;
+  }
+}
+
+
+/**
+ * Implementation of hook_form_alter().
+ *
+ */
+function book_access_form_alter($form_id, &$form) {
+  if ($form_id == 'book_node_form' && isset($form['parent'])) {
+    _book_access_restrict_options($form['parent']['#options']);
   }
 }
 
@@ -319,5 +335,39 @@ function _book_access_get_book_nid($nid) {
   }
   else {
     return _book_access_get_book_nid($parents[$nid]);
+  }
+}
+
+/**
+ * We don't want users to be able to add child pages to pages they do not
+ * have 'update' grants for, so we remove select options which point to book
+ * pages user does not have that grant for.
+ */
+function _book_access_restrict_options(&$options) {
+  global $user;
+  $permitted_nids = NULL;
+
+  if ($user->uid == 0 || user_access('administer nodes')) {
+    return;
+  }
+
+  $sql = "
+    SELECT nid
+    FROM {node_access}
+    WHERE realm = 'book_access'
+    AND gid IN (%s)
+    AND grant_update > 0
+  ";
+
+  $results = db_query($sql, implode(',', array_keys($user->roles)));
+
+  while ($result = db_fetch_object($results)) {
+    $permitted_nids[$result->nid] = $result->nid;
+  }
+
+  foreach ($options as $nid => $value) {
+    if ($nid > 0 && !isset($permitted_nids[$nid])) {
+      unset($options[$nid]);
+    }
   }
 }
