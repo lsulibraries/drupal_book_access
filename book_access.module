@@ -14,8 +14,8 @@
 /**
  * Implementation of hook_help()
  */
-function book_access_help($section) {
-  switch ($section) {
+function book_access_help($path, $arg) {
+  switch ($path) {
     case 'admin/content/book/access':
       return t('
         <p>Configure access control per book based on user roles. Settings
@@ -30,7 +30,7 @@ function book_access_help($section) {
         <p>For more information, see the !book_access_help page.</p>
       ',  array(
             '!book_access_help' => l(t('Book Access help'), 'admin/help/book_access'),
-            '!access_control' => l(t('Access Control'), 'admin/user/access'),
+            '!access_control' => l(t('Administer Permissions'), 'admin/user/permissions'),
             '!book_access_settings' => l(t('Book Access settings'), 'admin/content/book/access'),
           )
       );
@@ -51,7 +51,7 @@ function book_access_help($section) {
         You must turn off all enabled access controls in such modules.
         ', array(
               '!book_access_settings' => l(t('book access settings'), 'admin/content/book/access'),
-              '!access_control_settings' => l(t('access control settings'), 'admin/user/access'),
+              '!access_control_settings' => l(t('Administer Permissions'), 'admin/user/permissions'),
             )
 
       );
@@ -71,20 +71,17 @@ function book_access_perm() {
  * Implementation of hook_menu().
  *
  */
-function book_access_menu($may_cache) {
+function book_access_menu() {
 
-  if ($may_cache) {
     // we create an additional tab in the book admin page
-    $items[] = array(
-      'path'               => 'admin/content/book/access',
+    $items['admin/content/book/access'] = array(
       'title'              => t('Access control'),
-      'callback'           => 'drupal_get_form',
-      'callback arguments' => array('book_access_admin_form'),
+      'page callback'      => 'drupal_get_form',
+      'page arguments'     => array('book_access_admin_form'),
       'type'               => MENU_LOCAL_TASK,
       'weight'             => 7,
-      'access'             => user_access('administer book access'),
+      'access arguments'   => array('administer book access'),
     );
-  }
 
   return $items;
 }
@@ -106,14 +103,10 @@ function book_access_node_grants($user, $op) {
  * Checks to see if maybe we're being disabled.
  */
 function book_access_node_access_records($node) {
-  if (!book_access_enabled()) {
-    return;
-  }
-
   if ($node->type == 'book') {
-    $parent_nid = _book_access_get_book_nid($node->nid);
+    $book_nid = _book_access_get_book_nid($node->nid);
 
-    $result = db_query('SELECT * FROM {book_access} WHERE nid = %d', $parent_nid);
+    $result = db_query('SELECT * FROM {book_access} WHERE nid = %d', $book_nid);
     while ($grant = db_fetch_object($result)) {
       $grants[] = array(
         'realm'        => 'book_access',
@@ -132,7 +125,7 @@ function book_access_node_access_records($node) {
  * Implementation of hook_form_alter().
  *
  */
-function book_access_form_alter($form_id, &$form) {
+function book_access_form_alter(&$form, &$form_state, $form_id) {
   if ($form_id == 'book_node_form' && isset($form['parent'])) {
     _book_access_restrict_options($form['parent']['#options']);
   }
@@ -147,7 +140,7 @@ function book_access_admin_form() {
   $rids = array();
   $books = array();
 
-  drupal_add_css(drupal_get_path('module', 'book_access') . '/book_access.css');
+  drupal_add_css(drupal_get_path('module', 'book_access') .'/book_access.css');
 
   // Get a list of roles (which act as grant IDs)
   $results = db_query("SELECT r.rid, r.name FROM {role} r ORDER BY r.name");
@@ -159,9 +152,8 @@ function book_access_admin_form() {
   $sql = "
     SELECT n.nid, n.title
     FROM {node} n
-    LEFT JOIN {book} b ON n.vid = b.vid
-    WHERE b.parent = 0
-    ORDER BY b.weight ASC
+    LEFT JOIN {book} b ON n.nid = b.bid
+    WHERE b.nid = b.bid
   ";
 
   $book_results = db_query($sql);
@@ -179,9 +171,8 @@ function book_access_admin_form() {
     $delete = array();
 
     $result = db_query("SELECT * FROM {book_access} where nid = %d", $book_nid);
-
-    // if no existing grants, use some safe defaults
-    if (db_num_rows($result) == 0) {
+    // if no existing grants, use some safe defaults, only make sense for the first time when new book created
+    if (db_result($result) == 0) {
       $view   = array(1, 2);
       $update = array();
       $delete = array();
@@ -237,27 +228,27 @@ function book_access_admin_form() {
   );
   $form['submit'] = array(
     '#type'  => 'submit',
-    '#value' => t('Submit'),
+    '#value' => t('Save configuration'),
   );
   $form['notice'] = array(
     '#type'  => 'markup',
-    '#value' => '<p>' . t('Node access tables must be rebuilt when these changes are
-      submitted. This may take a few moments.') . '</p>',
+    '#value' => '<p>'. t('Node access tables must be rebuilt when these changes are
+      submitted. This may take a few moments.') .'</p>',
   );
 
   return $form;
 }
 
-function book_access_admin_form_submit($form_id, $form_values) {
+function book_access_admin_form_submit($form, &$form_state) {
 
-  foreach($form_values['access'] as $book_nid => $form) {
+  foreach ($form_state['values']['access'] as $book_nid => $access) {
     db_query("DELETE FROM {book_access} WHERE nid = %d", $book_nid);
 
-    foreach ($form['view'] as $rid => $checked) {
+    foreach ($access['view'] as $rid => $checked) {
       $gid = $rid;
       $grant_view = (bool) $checked;
-      $grant_update = $form['update'][$rid] > 0 ? TRUE : FALSE;
-      $grant_delete = $form['delete'][$rid] > 0 ? TRUE : FALSE;
+      $grant_update = $access['update'][$rid] > 0 ? TRUE : FALSE;
+      $grant_delete = $access['delete'][$rid] > 0 ? TRUE : FALSE;
 
       $sql = "
         INSERT INTO {book_access} (nid, rid, grant_view, grant_update, grant_delete)
@@ -281,56 +272,13 @@ function book_access_enabled($set = NULL) {
   return $enabled;
 }
 
-/**
- * Implementation of hook_enable().
- */
-function book_access_enable() {
-  node_access_rebuild();
-}
-
-/**
- * Implementation of hook_disable().
- */
-function book_access_disable() {
-  book_access_enabled(FALSE);
-  node_access_rebuild();
-}
-
-/**
- * Return array of book nodes and their parents.
- */
-function _book_access_get_parents() {
-  static $parents;
-
-  if (!is_array($parents)) {
-    $sql = "
-      SELECT n.nid, b.parent
-      FROM {node} n
-      LEFT JOIN {book} b ON n.vid = b.vid
-      WHERE n.type = 'book'
-    ";
-
-    $results = db_query($sql);
-    while ($result = db_fetch_object($results)) {
-      $parents[$result->nid] = $result->parent;
-    }
-  }
-
-  return $parents;
-}
 
 /**
  * Return the very top level (book) nid for a given book page.
  */
 function _book_access_get_book_nid($nid) {
-  $parents = _book_access_get_parents();
-
-  if ($parents[$nid] == 0) {
-    return $nid;
-  }
-  else {
-    return _book_access_get_book_nid($parents[$nid]);
-  }
+  $result = db_query("SELECT bid FROM {book} WHERE nid = %d", $nid);
+  return db_fetch_object($result)->bid;
 }
 
 /**
@@ -360,11 +308,9 @@ function _book_access_restrict_options(&$options) {
     $permitted_nids[$result->nid] = $result->nid;
   }
 
-  if (!empty($options)) {
-    foreach ($options as $nid => $value) {
-      if ($nid > 0 && !isset($permitted_nids[$nid])) {
-        unset($options[$nid]);
-      }
+  foreach ($options as $nid => $value) {
+    if ($nid > 0 && !isset($permitted_nids[$nid])) {
+      unset($options[$nid]);
     }
   }
 }

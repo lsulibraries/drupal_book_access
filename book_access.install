@@ -1,47 +1,71 @@
 <?php
 // $Id$
 
+/**
+ * Implementation of hook_install().
+ */
 function book_access_install() {
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      db_query("
-        CREATE TABLE IF NOT EXISTS {book_access} (
-          nid int(10) NOT NULL default 0,
-          rid int(10) NOT NULL default 0,
-          grant_view tinyint(1) unsigned NOT NULL default '0',
-          grant_update tinyint(1) unsigned NOT NULL default '0',
-          grant_delete tinyint(1) unsigned NOT NULL default '0',
-          KEY nid (nid),
-          KEY rid (rid)
-        );
-      ");
-      break;
-
-    case 'pgsql':
-      db_query("
-        CREATE TABLE {book_access} (
-          nid int NOT NULL DEFAULT 0,
-          rid int NOT NULL DEFAULT 0,
-          grant_view smallint NOT NULL DEFAULT 0,
-          grant_update smallint  NOT NULL DEFAULT 0,
-          grant_delete smallint NOT NULL DEFAULT 0,
-          PRIMARY KEY (nid, rid)
-        );
-      ");
-      break;
-
-  }
-
+  drupal_install_schema('book_access');
+  
   // not sure we need this
   //db_query("UPDATE {system} SET weight = 2 WHERE name = 'book_access'");
 
-  drupal_set_message("book_access database tables created.");
+  drupal_set_message("Book access database tables created.");
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function book_access_schema() {
+  $schema['book_access'] = array(
+    'description' => t('Table for tracking book access.'),
+    'fields' => array(
+      'nid' => array(
+        'description' => t('Primary key: The node ID of the book.'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'rid' => array(
+        'description' => t('Primary key: A role ID associated with a book node ID.'),
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'grant_view' => array(
+        'description' => t('View book is allowed. 1 = TRUE, 0 = FALSE.'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'insigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'grant_update' => array(
+        'description' => t('Edit book pages is allowed. 1 = TRUE, 0 = FALSE.'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'insigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'grant_delete' => array(
+        'description' => t('Delete book pages is allowed. 1 = TRUE, 0 = FALSE.'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'insigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('nid', 'rid'),
+  );
+
+  return $schema;
 }
 
 /**
  * Implementation of hook_uninstall().
  */
 function book_access_uninstall() {
-  db_query('DROP TABLE {book_access}');
+  drupal_uninstall_schema('book_access');
 }
