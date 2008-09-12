@@ -174,8 +174,9 @@ function book_access_admin_form() {
     $delete = array();
 
     $result = db_query("SELECT * FROM {book_access} where nid = %d", $book_nid);
-    // if no existing grants, use some safe defaults, only make sense for the first time when new book created
-    if (db_result($result) == 0) {
+    // if no existing grants, use some safe defaults, only make sense for the
+    // first time when new book created
+    if (db_affected_rows($result) == 0) {
       $view   = array(1, 2);
       $update = array();
       $delete = array();
