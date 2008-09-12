@@ -11,6 +11,8 @@
  *
  */
 
+define(BOOK_ACCESS_GRANT_PRIORITY, 0);
+
 /**
  * Implementation of hook_help()
  */
@@ -113,7 +115,8 @@ function book_access_node_access_records($node) {
         'gid'          => $grant->rid,
         'grant_view'   => $grant->grant_view,
         'grant_update' => $grant->grant_update,
-        'grant_delete' => $grant->grant_delete
+        'grant_delete' => $grant->grant_delete,
+        'priority'     => BOOK_ACCESS_GRANT_PRIORITY,
       );
     }
 
