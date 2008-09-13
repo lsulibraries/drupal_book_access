@@ -132,6 +132,14 @@ function book_access_form_alter(&$form, &$form_state, $form_id) {
   if ($form_id == 'book_node_form' && isset($form['parent'])) {
     _book_access_restrict_options($form['parent']['#options']);
   }
+
+  // when an outline is modified, taxonomy is changed, but the node is not
+  // saved, so node grants can become broken if a book page is moved into
+  // another book. so we fix that by adding an additional #submit callback
+  // that rebuilds the grants when the book outline is modified.
+  if ($form_id == 'book_outline_form') {
+    $form['#submit'][] = '_book_access_build_node_grants';
+  }
 }
 
 /**
@@ -276,6 +284,15 @@ function book_access_enabled($set = NULL) {
   return $enabled;
 }
 
+/**
+ * Somewhat redundant node grants function to allow us to set a node's grants
+ * when a book outline is modified
+ */
+function _book_access_build_node_grants($form) {
+  $node = $form['#node'];
+  $grants = book_access_node_access_records($node);
+  node_access_write_grants($node, $grants, 'book_access');
+}
 
 /**
  * Return the very top level (book) nid for a given book page.
