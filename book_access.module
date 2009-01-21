@@ -329,9 +329,11 @@ function _book_access_restrict_options(&$options) {
     $permitted_nids[$result->nid] = $result->nid;
   }
 
-  foreach ($options as $nid => $value) {
-    if ($nid > 0 && !isset($permitted_nids[$nid])) {
-      unset($options[$nid]);
+  if (isset($options)) {
+    foreach ($options as $nid => $value) {
+      if ($nid > 0 && !isset($permitted_nids[$nid])) {
+        unset($options[$nid]);
+      }
     }
   }
 }
