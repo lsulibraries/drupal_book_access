@@ -4,13 +4,14 @@
 /**
  * @file
  *
- * Allow access control for Drupal book nodes.
+ * Allow access control for book nodes on a per book basis.
  *
  * Based on forum_access.module and tac_lite.module
  *
  *
  */
 
+// defines may become admin settings in the future
 define(BOOK_ACCESS_GRANT_PRIORITY, 0);
 
 /**
@@ -25,35 +26,37 @@ function book_access_help($path, $arg) {
         different book, it will assume that book\'s access control settings.</p>
         <p><em>Important:</em> If you are going to manage access control here,
         please disable the "edit book pages" and "edit own book pages"
-        permissions in the !access_control page or else you may see unexpected
-        behavior.</p>
+        permissions in the <a href="@permissions">Permissions</a> page or else
+        you may see unexpected behavior.</p>
         <p>These settings will have no effect for roles with "administer nodes"
         permission.</p>
-        <p>For more information, see the !book_access_help page.</p>
+        <p>For more information, see the <a href="@book_access_help">Book Access
+        Help</a>.</p>
       ',  array(
-            '!book_access_help' => l(t('Book Access help'), 'admin/help/book_access'),
-            '!access_control' => l(t('Administer Permissions'), 'admin/user/permissions'),
-            '!book_access_settings' => l(t('Book Access settings'), 'admin/content/book/access'),
+            '@permissions' => url('admin/user/permissions'),
+            '@book_access_help' => url('admin/help/book_access'),
           )
       );
       break;
     case 'admin/help#book_access':
       return t('
-        <p>Allows fine grained access control for books.</p>
-        <p>Permissions enabled in !access_control_settings will override
-        !book_access_settings. So, for example, if you would like a role to be
-        able to edit all book pages, regardless, enable "edit pages" in
-        !access_control_settings. However, if you would like to control edit
-        permission on a per book basis, disable that permission in
-        !access_control_settings and configure !book_access_settings
+        <p>Allow access control for book nodes on a per book basis.</p>
+        <p><a href="@permissions">Permissions enabled</a> will override <a
+        href="@book_access_settings">Book Access Settings</a>. So, for example,
+        if you would like a role to be able to edit all book pages, regardless,
+        enable "edit pages" in <a href="@permissions">Permissions</a>. However,
+        if you would like to control edit permission on a per book basis,
+        disable that permission in <a href="@permissions">Permissions</a> and
+        configure <a href="@book_access_settings">Book Access Settings</a>
         accordingly.
         <p>Certain access control modules can impact functionality of this
         module. Broad reaching modules such as "taxonomy access" and "content
-        access" can override the values set in the !book_access_settings page.
-        You must turn off all enabled access controls in such modules.
+        access" can override the values set in the <a
+        href="@book_access_settings">Book Access Settings</a> page. You must
+        turn off all enabled access controls in such modules.
         ', array(
-              '!book_access_settings' => l(t('book access settings'), 'admin/content/book/access'),
-              '!access_control_settings' => l(t('Administer Permissions'), 'admin/user/permissions'),
+              '@book_access_settings' => url('admin/content/book/access'),
+              '@permissions' => url('admin/user/permissions'),
             )
 
       );
@@ -102,11 +105,11 @@ function book_access_node_grants($user, $op) {
  *
  * Returns a list of grant records for the passed in book node object. If we
  * have a book child page, we return the access settings of the top level parent.
- * Checks to see if maybe we're being disabled.
  */
 function book_access_node_access_records($node) {
-  if ($node->type == 'book') {
-    $book_nid = _book_access_get_book_nid($node->nid);
+
+  if (isset($node->book)) {
+    $book_nid = $node->book['bid'];
 
     $result = db_query('SELECT * FROM {book_access} WHERE nid = %d', $book_nid);
     while ($grant = db_fetch_object($result)) {
@@ -154,10 +157,7 @@ function book_access_admin_form() {
   drupal_add_css(drupal_get_path('module', 'book_access') .'/book_access.css');
 
   // Get a list of roles (which act as grant IDs)
-  $results = db_query("SELECT r.rid, r.name FROM {role} r ORDER BY r.name");
-  while ($result = db_fetch_object($results)) {
-    $rids[$result->rid] = $result->name;
-  }
+  $rids = user_roles();
 
   // Get listing of books, each of which will have it's own access settings
   $sql = "
@@ -185,7 +185,7 @@ function book_access_admin_form() {
     // if no existing grants, use some safe defaults, only make sense for the
     // first time when new book created
     if (db_affected_rows($result) == 0) {
-      $view   = array(1, 2);
+      $view   = array(1);
       $update = array();
       $delete = array();
     }
@@ -274,14 +274,17 @@ function book_access_admin_form_submit($form, &$form_state) {
 }
 
 /**
- * Helper function.
+ * Implementation of hook_enable().
  */
-function book_access_enabled($set = NULL) {
-  static $enabled = TRUE;
-  if ($set !== NULL) {
-    $enabled = $set;
-  }
-  return $enabled;
+function book_access_enable() {
+  node_access_needs_rebuild();
+}
+
+/**
+ * Implementation of hook_disable().
+ */
+function book_access_disable() {
+  node_access_needs_rebuild();
 }
 
 /**
@@ -292,14 +295,6 @@ function _book_access_build_node_grants($form) {
   $node = $form['#node'];
   $grants = book_access_node_access_records($node);
   node_access_write_grants($node, $grants, 'book_access');
-}
-
-/**
- * Return the very top level (book) nid for a given book page.
- */
-function _book_access_get_book_nid($nid) {
-  $result = db_query("SELECT bid FROM {book} WHERE nid = %d", $nid);
-  return db_fetch_object($result)->bid;
 }
 
 /**
@@ -335,5 +330,24 @@ function _book_access_restrict_options(&$options) {
         unset($options[$nid]);
       }
     }
+  }
+}
+
+/**
+ * Implementation of hook_node_access_explain() [devel.module].
+ *
+ */
+function book_access_node_access_explain($row) {
+  static $roles = NULL;
+
+  if ($row->realm == 'book_access') {
+    if (!isset($roles)) {
+      $roles = user_roles();
+    }
+    if (isset($roles[$row->gid])) {
+      //return array($roles[$row->gid]);
+      return t('grants for users of role') . ': ' . $roles[$row->gid];
+    }
+    return array('(unknown gid!)');
   }
 }
