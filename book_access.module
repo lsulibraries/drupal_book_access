@@ -259,8 +259,8 @@ function book_access_admin_form_submit($form, &$form_state) {
     foreach ($access['view'] as $rid => $checked) {
       $gid = $rid;
       $grant_view = (bool) $checked;
-      $grant_update = $access['update'][$rid] > 0 ? TRUE : FALSE;
-      $grant_delete = $access['delete'][$rid] > 0 ? TRUE : FALSE;
+      $grant_update = ($access['update'][$rid]);
+      $grant_delete = ($access['delete'][$rid]);
 
       $sql = "
         INSERT INTO {book_access} (nid, rid, grant_view, grant_update, grant_delete)
