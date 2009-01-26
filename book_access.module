@@ -54,6 +54,11 @@ function book_access_help($path, $arg) {
         access" can override the values set in the <a
         href="@book_access_settings">Book Access Settings</a> page. You must
         turn off all enabled access controls in such modules.
+        <p>To be clear, if you are using additional access control modules, be
+        certain that none of them are allowing access to book nodes. The simplest
+        way to do this is to limit the types of pages that a book may contain to
+        a single node type (such as "book page") and unset any access grants
+        provided by other modules on that node type\'s configuration page.
         ', array(
               '@book_access_settings' => url('admin/content/book/access'),
               '@permissions' => url('admin/user/permissions'),
@@ -132,8 +137,10 @@ function book_access_node_access_records($node) {
  *
  */
 function book_access_form_alter(&$form, &$form_state, $form_id) {
-  if ($form_id == 'book_node_form' && isset($form['parent'])) {
-    _book_access_restrict_options($form['parent']['#options']);
+
+  if ((isset($form['type']) && isset($form['#node']) && $form['type']['#value'] .'_node_form' == $form_id)
+      || ($form_id == 'book_outline_form')) {
+    _book_access_restrict_options($form['#node']->nid, $form['book']['bid']['#options']);
   }
 
   // when an outline is modified, taxonomy is changed, but the node is not
@@ -141,6 +148,7 @@ function book_access_form_alter(&$form, &$form_state, $form_id) {
   // another book. so we fix that by adding an additional #submit callback
   // that rebuilds the grants when the book outline is modified.
   if ($form_id == 'book_outline_form') {
+    // TODO: diff settings before/after and only rebuild if changes were made
     $form['#submit'][] = '_book_access_build_node_grants';
   }
 }
@@ -257,10 +265,9 @@ function book_access_admin_form_submit($form, &$form_state) {
     db_query("DELETE FROM {book_access} WHERE nid = %d", $book_nid);
 
     foreach ($access['view'] as $rid => $checked) {
-      $gid = $rid;
       $grant_view = (bool) $checked;
-      $grant_update = ($access['update'][$rid]);
-      $grant_delete = ($access['delete'][$rid]);
+      $grant_update = ($access['update'][$rid] > 0);
+      $grant_delete = ($access['delete'][$rid] > 0);
 
       $sql = "
         INSERT INTO {book_access} (nid, rid, grant_view, grant_update, grant_delete)
@@ -302,9 +309,9 @@ function _book_access_build_node_grants($form) {
  * have 'update' grants for, so we remove select options which point to book
  * pages user does not have that grant for.
  */
-function _book_access_restrict_options(&$options) {
+function _book_access_restrict_options($bid, &$options) {
   global $user;
-  $permitted_nids = NULL;
+  $permitted_bids = NULL;
 
   if ($user->uid == 0 || user_access('administer nodes')) {
     return;
@@ -321,12 +328,16 @@ function _book_access_restrict_options(&$options) {
   $results = db_query($sql, implode(',', array_keys($user->roles)));
 
   while ($result = db_fetch_object($results)) {
-    $permitted_nids[$result->nid] = $result->nid;
+    $permitted_bids[$result->nid] = $result->nid;
   }
 
   if (isset($options)) {
-    foreach ($options as $nid => $value) {
-      if ($nid > 0 && !isset($permitted_nids[$nid])) {
+    foreach ($options as $bid => $value) {
+      // <create new book> option uses current nid as the key, skip it
+      if ($bid == $nid) {
+        continue;
+      }
+      if ($bid > 0 && !isset($permitted_bids[$bid])) {
         unset($options[$nid]);
       }
     }
