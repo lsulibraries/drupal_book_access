@@ -1,0 +1,59 @@
+; $Id$
+; All the dates reported here are referred to UTC.
+
+Book access 6.x-1 2010-05-11
+----------------------------
+#396838 by kiam: Add an option for the node access default values.
+
+Book access 6.x-1 2010-02-25
+----------------------------
+#721720 by kbsymanz: Add child page link removed when it should not be.
+
+Book access 6.x-1 2010-02-13
+----------------------------
+#682948 by kiamlaluno: Members losing access sporadically.
+
+Book access 6.x-1 2010-02-10
+----------------------------
+#639334 by kiamlaluno: Re-arrange, and change the help text.
+
+Book access 6.x-1 2010-01-15
+----------------------------
+#685058 by deviantintegral: Outline tab is shown for anonymous users on non-book pages.
+
+Book access 6.x-1 2010-01-10
+----------------------------
+#680832 by kiamlaluno: Integration with CheckAll.
+#678798 by kiamlaluno: Change the settings page.
+#370448 by kiamlaluno: Add Access Control tabs to top-level book pages.
+
+Book access 6.x-1 2010-01-08
+----------------------------
+#375948 by Neodym, kiamlaluno: Removal of "Add Child Page" link and "Outline" tab if update permission is not granted on the book.
+
+Book access 6.x-1 2010-01-07
+----------------------------
+#676106 by gcaldonazzi, kiamlaluno: Problem with book_access.install.
+
+Book access 6.x-1 2010-01-01
+----------------------------
+#671864: Table 'book_access' doesn't exist.
+
+Book access 6.x-1 2009-12-13
+----------------------------
+#658424 by kiamlaluno: Implement hook_user().
+#658422 by kiamlaluno: Implement hook_nodeapi('delete').
+#361516 by deviantintegral, kiamlaluno: Use Book access to create User-based book permissions.
+#370452 by deviantintegral: By default, authenticated users can't view books.
+
+Book access 6.x-1 2009-11-23
+----------------------------
+#640098 by ilo: book_access_node_access_explain() fix.
+#640052 by ilo: Error viewing a book page with permissions to create a child page (hook_nodeapi() issues).
+#639326 by ilo: Error while showing the module settings page.
+#640040 by ilo: Enforce book node type and book[bid] checks.
+
+Book access 6.x-1 2009-11-19
+----------------------------
+#639318 by KiamLaLuno: Use of undefined constant BOOK_ACCESS_GRANT_PRIORITY.
+#340162 by dooug, imrook, KiamLaLuno: User can create page for every books.
