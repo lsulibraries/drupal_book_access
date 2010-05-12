@@ -3,4 +3,6 @@ name = Book access
 description = Allow access control for book nodes on a per book basis.
 package = Access control
 dependencies[] = book
+dependencies[] = vars
 core = 6.x
+php = 5.2

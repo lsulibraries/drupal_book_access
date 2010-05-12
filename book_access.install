@@ -124,7 +124,7 @@ function book_access_install() {
 /**
  * Implements hook_update_N().
  */
-function book_access_update_6100() {
+function book_access_update_6200() {
   $ret[] = update_sql("UPDATE {system} SET weight = 2 WHERE name = 'book_access'");
 
   return $ret;
@@ -133,7 +133,7 @@ function book_access_update_6100() {
 /**
  * Implements hook_update_N().
  */
-function book_access_update_6101() {
+function book_access_update_6201() {
   $ret = array();
   $schema = array();
 
@@ -188,7 +188,7 @@ function book_access_update_6101() {
 /**
  * Implements hook_update_N().
  */
-function book_access_update_6103() {
+function book_access_update_6203() {
   $ret = array();
 
   $ret[] = update_sql("UPDATE {node_access} SET realm = 'book_access_role' WHERE realm = 'book_access'");
@@ -199,7 +199,7 @@ function book_access_update_6103() {
 /**
  * Implements hook_update_N().
  */
-function book_access_update_6104() {
+function book_access_update_6204() {
   $ret = array();
 
   db_drop_primary_key($ret, 'book_access_role');
@@ -272,8 +272,11 @@ function book_access_update_6104() {
   );
   db_add_primary_key($ret, 'book_access_user', array('nid', 'uid'));
 
-  if (!variable_get('menu_rebuild_needed', FALSE)) {
-    variable_set('menu_rebuild_needed', TRUE);
+  drupal_load('module', 'book_access');
+  $vars = new BookAccessVars();
+
+  if (!$vars['menu_rebuild_needed']) {
+    $vars['menu_rebuild_needed'] = TRUE;
 
     $ret[] = array(
       'success' => TRUE,
@@ -290,6 +293,8 @@ function book_access_update_6104() {
 function book_access_uninstall() {
   drupal_uninstall_schema('book_access');
 
-  variable_del('book_access_default_roles_access');
-  variable_del('book_access_default_users_access');
+  module_load_include('inc', 'book_access', 'book_access.vars');
+  $vars = new BookAccessVars();
+
+  $vars->removeDefaults();
 }
