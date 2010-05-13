@@ -21,7 +21,7 @@ class BookAccessVars extends Vars {
    ));
   }
 
-  protected function getDefaults() {
+  public function getDefaults() {
     return array(
       'book_access_default_roles_access' => array('value' => array()),
       'book_access_default_users_access' => array('value' => array()),
