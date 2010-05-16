@@ -13,7 +13,6 @@ define('BOOK_ACCESS_GRANT_PRIORITY', 0);
 class BookAccessVars extends Vars {
   public function __construct() {
    parent::__construct('book_access', array(
-     'prefix' => 'book_access_',
      'sysVars' => array(
        'menu_rebuild_needed' => FALSE,
        'book_child_type' => 'book',
@@ -21,7 +20,7 @@ class BookAccessVars extends Vars {
    ));
   }
 
-  public function getDefaults() {
+  protected function getDefaults() {
     return array(
       'book_access_default_roles_access' => array('value' => array()),
       'book_access_default_users_access' => array('value' => array()),

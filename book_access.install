@@ -117,8 +117,10 @@ function book_access_schema() {
  */
 function book_access_install() {
   drupal_install_schema('book_access');
-
   db_query("UPDATE {system} SET weight = 2 WHERE name = 'book_access'");
+
+  $vars = new BookAccessVars();
+  $vars->saveDefaults();
 }
 
 /**
@@ -294,7 +296,7 @@ function book_access_uninstall() {
   drupal_uninstall_schema('book_access');
 
   module_load_include('inc', 'book_access', 'book_access.vars');
-  $vars = new BookAccessVars();
 
+  $vars = new BookAccessVars();
   $vars->removeDefaults();
 }
