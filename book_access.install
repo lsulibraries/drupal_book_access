@@ -290,6 +290,23 @@ function book_access_update_6204() {
 }
 
 /**
+ * Implements hook_update_N().
+ */
+function book_access_update_6205() {
+  $ret = array();
+
+  $vars = new BookAccessVars();
+  $vars->saveDefaults();
+
+  $ret[] = array(
+    'success' => TRUE,
+    'query' => 'Updated the persistent variables default values',
+  );
+
+  return $ret;
+}
+
+/**
  * Implements hook_uninstall().
  */
 function book_access_uninstall() {
