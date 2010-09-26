@@ -1,6 +1,6 @@
 ; $Id$
 name = Book access
-description = Allow access control for book nodes on a per book basis.
+description = Allows to set the access control for book nodes on a per book basis.
 package = Access control
 dependencies[] = book
 dependencies[] = vars

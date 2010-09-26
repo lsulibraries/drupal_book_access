@@ -4,13 +4,27 @@
 /**
  * @file
  *
- * Allow access control for book nodes on a per book basis.
+ * Allows to set the access control for book nodes on a per book basis.
  * Based on forum_access.module and tac_lite.module.
  */
 
+/**
+ * The API version implemented by the module.
+ */
+define('BOOK_ACCESS_API_VERSION', '2.2');
+
+/**
+ * The default priority used by the access grants implemented by the module.
+ */
 define('BOOK_ACCESS_GRANT_PRIORITY', 0);
 
+/**
+ * Allows to access the Drupal variables used by the module.
+ */
 class BookAccessVars extends Vars {
+  /**
+   * Constructs a BookAccessVars object.
+   */
   public function __construct() {
    parent::__construct('book_access', array(
      'sysVars' => array(
@@ -20,8 +34,12 @@ class BookAccessVars extends Vars {
    ));
   }
 
+  /**
+   * Implements Vars::getDefaults().
+   */
   protected function getDefaults() {
     return array(
+      'book_access_default_authors_access' => array('value' => array()),
       'book_access_default_roles_access' => array('value' => array()),
       'book_access_default_users_access' => array('value' => array()),
     );
@@ -31,204 +49,74 @@ class BookAccessVars extends Vars {
 /**
  * Implements hook_form_alter().
  *
+ * @see book_outline_form()
+ * @see book_access_outline_form_submit()
+ * @see book_access_edit_form_submit()
+ *
  */
 function book_access_form_alter(&$form, &$form_state, $form_id) {
+  if (isset($form['type']) && isset($form['#node']) && $form['type']['#value'] .'_node_form' == $form_id) {
+    if (isset($form['book']['bid']['#options'])) {
+      _book_access_options_restrict($form['book']['bid']['#options']);
+    }
 
-  $bool = (
-    isset($form['book']['bid']['#options']) &&
-    (
-      (
-        isset($form['type']) &&
-        isset($form['#node']) &&
-        $form['type']['#value'] .'_node_form' == $form_id
-      ) ||
-      $form_id == 'book_outline_form'
-    )
-  );
-
-  if ($bool) {
-    _book_access_restrict_options($form['book']['bid']['#options']);
+    $form['#submit'][] = 'book_access_edit_form_submit';
   }
-
-  // When an outline is modified, taxonomy is changed but the node is not
+  // When an outline is modified, the taxonomy is changed but the node is not
   // saved; node grants can become broken if a book page is moved into
   // another book. We fix that by adding an additional #submit callback
   // to rebuild the grants when the book outline is modified.
-  if ($form_id == 'book_outline_form') {
+  elseif ($form_id == 'book_outline_form') {
+    if (isset($form['book']['bid']['#options'])) {
+      _book_access_options_restrict($form['book']['bid']['#options']);
+    }
+
     $form['#submit'][] = 'book_access_outline_form_submit';
 
     if (isset($form['remove'])) {
       $form['remove']['#submit'][] = 'book_access_edit_form_submit';
     }
   }
-  elseif ($bool) {
-    $form['#submit'][] = 'book_access_edit_form_submit';
-  }
 }
 
 /**
- * Implements hook_form_FORM_ID_alter().
+ * Implements hook_link_alter().
  *
- */
-function book_access_form_book_admin_settings_alter(&$form, &$form_state) {
-  $vars = new BookAccessVars();
-
-  $form['book_access_default_roles_access'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Default roles access'),
-    '#default_value' => $vars['default_roles_access'],
-    '#options' => array(
-      'view' => t('View book'),
-      'update' => t('Edit pages'),
-      'delete' => t('Delete pages'),
-    ),
-    '#description' => t('The default access values for the new roles.'),
-  );
-
-  $form['book_access_default_users_access'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Default users access'),
-    '#default_value' => $vars['default_users_access'],
-    '#options' => array(
-      'view' => t('View book'),
-      'update' => t('Edit pages'),
-      'delete' => t('Delete pages'),
-    ),
-    '#description' => t('The default access values for the new users.'),
-  );
-
-  $form['buttons']['#weight'] = 100;
-}
-
-/**
- * Implements hook_help().
- */
-function book_access_help($path, $arg) {
-  switch ($path) {
-    case 'admin/help#book_access':
-      $help = '<p>' . t(
-        'Allow access control for book nodes on a per book basis.</p>
-        <p><a href="@permissions">Permissions enabled</a> will override the
-        module <a href="@book_access_settings">access settings</a>. For example,
-        if you would like a role to be able to edit all book pages,
-        enable <q>edit pages</q> in <a href="@permissions">Permissions</a>.
-        If you would like to control edit permission on a per book basis,
-        disable that permission in <a href="@permissions">Permissions</a> and
-        configure the module <a href="@book_access_settings">access settings</a>
-        accordingly.', array(
-          '@book_access_settings' => url('admin/content/book/access'),
-          '@permissions' => url('admin/user/permissions'),
-        ) . '</p>' .
-        '<p>' . t('Certain access control modules can impact functionality of this
-        module. Broad reaching modules such as "taxonomy access" and "content
-        access" can override the values set in the <a
-        href="@book_access_settings">access settings</a> page. You must
-        turn off all enabled access controls in such modules.</p>
-        <p>If you are using additional access control modules, be
-        certain that none of them are allowing access to book nodes. The simplest
-        way to do this is to limit the types of pages that a book may contain to
-        a single node type (such as <q>book page</q>) and unset any access grants
-        provided by other modules on that node type configuration page.',
-        array('@book_access_settings' => url('admin/content/book/access'))) . '</p>'
-      );
-      break;
-
-    case 'node/%/book_access':
-      $help = '<p>' . t(
-        'Configure access control per book based on users or roles. Settings
-        affect all pages within the given book.
-        These settings will have no effect for roles with permission to administer nodes.'
-      ) . '</p>';
-      break;
-
-    default:
-      $help = '';
-  }
-
-  return $help;
-}
-
-/**
- * Implementations hook_link_alter().
+ * Enables the link "Add child page" only for users who have ther right
+ * permission.
  */
 function book_access_link_alter(&$links, $node) {
-  global $user;
-
-  $bool = (
-    !isset($links['book_add_child']) ||
-    user_access('administer nodes') ||
-    !isset($node->book['bid'])
-  );
-  $vars = new BookAccessVars();
-
-  if ($bool) {
+  if (user_access('administer nodes')) {
     return;
   }
 
-  $roles = array_keys($user->roles);
-  $grant_update = (
-    db_result(
-      db_query_range(
-        "SELECT 1 FROM {node_access} WHERE realm = 'book_access_role' AND nid = %d AND gid IN (" . db_placeholders($roles, 'int') . ") AND grant_update > 0",
-        array_merge(array($node->book['bid']), $roles), 0, 1
-      )
-    ) ||
-    db_result(
-      db_query(
-        "SELECT 1 FROM {node_access} WHERE realm = 'book_access_user' AND nid = %d AND gid = %d AND grant_update > 0",
-        $node->book['bid'], $user->uid, 0, 1
-      )
-    )
-  );
+  if (isset($node->book['bid']) && isset($links['book_add_child'])) {
+    $vars = new BookAccessVars();
 
-  $bool = (
-    (
-      user_access('add content to books') ||
-      user_access('administer book outlines')
-    ) &&
-    node_access('create', $vars['book_child_type']) &&
-    $grant_update &&
-    $node->status == 1 &&
-    $node->book['depth'] < MENU_MAX_DEPTH
-  );
+    $grant_add_child = book_access_grant_check($node->book['bid'], 'add_child');
 
-  if (!$bool) {
-    unset($links['book_add_child']);
+    $bool = (
+      (
+        user_access('add content to books') ||
+        user_access('administer book outlines') ||
+        $grant_add_child
+      ) &&
+      node_access('create', $vars['book_child_type']) &&
+      $node->status == 1 &&
+      $node->book['depth'] < MENU_MAX_DEPTH
+    );
+
+    if (!$bool) {
+      unset($links['book_add_child']);
+    }
   }
 }
 
 /**
- * Implements hook_menu().
- */
-function book_access_menu() {
-  $item = array();
-
-  // We create an additional tab in each top-level book view page.
-  $items['node/%node/book_access'] = array(
-    'title' => 'Book access',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('book_access_permissions_form', 1),
-    'access callback' => 'book_access_permissions_form_access',
-    'access arguments' => array(1),
-    'type' => MENU_LOCAL_TASK,
-    'weight' => 2,
-    'file' => 'book_access.admin.inc',
-  );
-
-  $items['book_access/delete/user_permission/%node/%user'] = array(
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('book_access_remove_user_permissions', 3, 4),
-    'access arguments' => array('administer book access'),
-    'type' => MENU_CALLBACK,
-    'file' => 'book_access.admin.inc',
-  );
-
-  return $items;
-}
-
-/**
- * Implementations hook_menu_alter().
+ * Implements hook_menu_alter().
  *
+ * @see book_access_outline_access()
+ * @see book_access_outline_remove_access()
  */
 function book_access_menu_alter(&$items) {
   if (isset($items['node/%node/outline'])) {
@@ -251,7 +139,12 @@ function book_access_node_access_explain($row) {
   static $roles = NULL;
   $result = array();
 
-  if ($row->realm == 'book_access_role') {
+  if ($row->realm == 'book_access_author') {
+    $result = array(
+      t('Grants for book authors')
+    );
+  }
+  elseif ($row->realm == 'book_access_role') {
     if (!isset($roles)) {
       $roles = user_roles();
     }
@@ -302,8 +195,10 @@ function book_access_node_access_explain($row) {
    $grants = array();
 
   if (isset($node->book['bid'])) {
-    _book_access_node_access_records_roles($grants, $node->book['bid']);
-    _book_access_node_access_records_users($grants, $node->book['bid']);
+    $bid =  $node->book['bid'];
+    book_access_author_records($grants, $bid);
+    book_access_role_records($grants, $bid);
+    book_access_user_records($grants, $bid);
   }
 
   return $grants;
@@ -313,6 +208,9 @@ function book_access_node_access_explain($row) {
  * Implements hook_node_grants().
  */
 function book_access_node_grants($account, $op) {
+  $grants = array();
+
+  $grants['book_access_author'] = array($account->uid);
   $grants['book_access_role'] = array_keys($account->roles);
   $grants['book_access_user'] = array($account->uid);
 
@@ -323,9 +221,20 @@ function book_access_node_grants($account, $op) {
  * Implements hook_nodeapi().
  */
 function book_access_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
-  if ($op =='delete') {
-    db_query("DELETE FROM {book_access_role} WHERE nid = %d", $node->nid);
-    db_query("DELETE FROM {book_access_user} WHERE nid = %d", $node->nid);
+  if (!empty($node->nid)) {
+    $nid = $node->nid;
+
+    switch ($op) {
+      case 'delete':
+        db_query("DELETE FROM {book_access_author} WHERE nid = %d", $nid);
+        db_query("DELETE FROM {book_access_role} WHERE nid = %d", $nid);
+        db_query("DELETE FROM {book_access_user} WHERE nid = %d", $nid);
+        break;
+
+      case 'update':
+        db_query("UPDATE {book_access_author} SET uid = %d WHERE nid = %d", $node->uid, $nid);
+        break;
+    }
   }
 }
 
@@ -334,60 +243,51 @@ function book_access_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
  *
  */
 function book_access_perm() {
-  return array('administer book access');
-}
-
-/**
- * Implements hook_theme().
- *
- */
-function book_access_theme() {
   return array(
-    'book_access_permissions_form' => array(
-      'arguments' => array('form' => array()),
-      'file' => 'book_access.admin.inc',
-    ),
+    'administer book access',
+    'administer access of any books',
+    'administer access of own books',
   );
-
 }
 
 /**
  * Implements hook_user().
- *
  */
 function book_access_user($op, &$edit, &$account, $category = NULL) {
   if ($op == 'delete') {
-    db_query("DELETE FROM {book_access_user} WHERE uid = %d", $account->uid);
+    $uid = $account->uid;
+    db_query("DELETE FROM {book_access_author} WHERE uid = %d", $uid);
+    db_query("DELETE FROM {book_access_user} WHERE uid = %d", $uid);
   }
 }
 
 /**
- * Menu item access callback - determine if the outline tab is accessible.
+ * Determines if the outline tab is accessible.
+ *
+ * @see book_access_menu_alter()
  */
 function book_access_outline_access($node) {
-  $bool = (
-    user_access('administer book outlines') &&
-    node_access('view', $node)
-  );
+  if (!isset($node->book['bid'])) {
+    return FALSE;
+  }
 
-  if ($bool) {
+  $view_access = node_access('view', $node);
+
+  if (user_access('administer book outlines') && $view_access) {
     return TRUE;
   }
 
-  // Get all permitted books
-  $permitted_books = _book_access_user_books_list('update');
-
-  // If this node is not in the list of permitted books, then remove the tab.
-  return isset($node->book['bid']) ? in_array($node->book['bid'], $permitted_books) : FALSE;
+  return book_access_grant_check($node->book['bid'], 'edit_outline') && $view_access;
 }
 
 /**
- * Menu item access callback - determine if the user can remove nodes from the
- * outline.
+ * Determines if the user can remove nodes from the outline.
+ *
+ * @see book_access_menu_alter()
  */
 function book_access_outline_remove_access($node) {
   $bool = (
-    isset($node->book) &&
+    isset($node->book['bid']) &&
     ($node->book['bid'] != $node->nid) &&
     book_access_outline_access($node)
   );
@@ -396,51 +296,232 @@ function book_access_outline_remove_access($node) {
 }
 
 /**
- * Menu item access callback - determine when the book access tab can be
- * shown in the node edit page.
- */
-function book_access_permissions_form_access($node) {
-  $bool = (
-    isset($node->book['bid']) &&
-    user_access('administer book access')
-  );
-
-  return $bool;
-}
-
-/**
- * Submission callback for the node edit form, and the form 'book_outline_form'.
+ * Form submission callback for node_form(), and book_outline_form().
+ *
+ * @see node_form()
+ * @see book_outline_form()
+ * @see book_access_form_alter()
  */
 function book_access_edit_form_submit($form, &$form_state) {
   $node = $form['#node'];
 
-  _book_access_build_node_grants($node);
+  book_access_node_grants_build($node);
 }
 
 /**
- * Submission callback for the form 'book_outline_form'.
+ * Form submission callback for book_outline_form().
+ *
+ * @see book_outline_form()
+ * @see book_access_form_alter()
  */
 function book_access_outline_form_submit($form, &$form_state) {
   $node = $form['#node'];
 
   if (isset($form['plid']) && $form['plid'] != $form_state['values']['plid']) {
-    _book_access_build_node_grants($node);
+    book_access_node_grants_build($node);
   }
 }
 
-function _book_access_build_node_grants($node) {
+/**
+ * Verifies the current API version is included between two values passes as
+ * arguments.
+ *
+ * @param $minimum
+ *   The minimum API version required.
+ * @param $maximum
+ *   The maximum version required. This argument is optional; the current API
+ *   will be checked against this value only if it is passed to the function.
+ *
+ * @return
+ *   TRUE, if the current API version is included between the passed values.
+ */
+function book_access_api($minimum, $maximum = NULL) {
+  if (version_compare(BOOK_ACCESS_API_VERSION, $minimum, '<')) {
+    return FALSE;
+  }
+
+  if (isset($maximum) && version_compare(BOOK_ACCESS_API_VERSION, $maximum, '>')) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+/**
+ * Adds author grants to book pages.
+ *
+ * @param $bid
+ *   The book ID.
+ * @param $uid
+ *   The user ID of the book author.
+ * @param $grants
+ *   An array of grants, in the format @code $grants[$grant] @endcode,
+ *   where @code $grant @endcode is a string between 'grant_view',
+ *   'grant_update', 'grant_delete', 'grant_admin_access', 'grant_add_child',
+ *   'grant_edit_outline'.
+ */
+ function book_access_author_add($bid, $uid, array $grants) {
+  $grant_ids = array(
+    'grant_view', 'grant_update', 'grant_delete',
+    'grant_admin_access', 'grant_add_child', 'grant_edit_outline',
+  );
+
+  $row = new stdClass();
+  $row->nid = $bid;
+  $row->uid = $uid;
+
+  $bool = db_result(
+    db_query_range(
+      "SELECT 1 FROM {book_access_author} WHERE nid = %d AND uid = %d",
+      $bid, $uid, 0, 1
+    )
+  );
+
+  foreach ($grant_ids as $id) {
+    $row->$id = !empty($grants[$id]);
+  }
+
+  drupal_write_record('book_access_author', $row, $bool ? array('nid', 'uid') : array());
+}
+
+/**
+ * Gets the list of grant records assigned to book authors for a book.
+ *
+ * @param $grants
+ *   An array of grants.
+ * @param $bid
+ *   The ID of the book for which the function returns the grant records.
+ */
+function book_access_author_records(&$grants, $bid) {
+  $result = db_query('SELECT * FROM {book_access_author} WHERE nid = %d', $bid);
+
+  while ($grant = db_fetch_object($result)) {
+    $grants[] = array(
+      'realm'        => 'book_access_role',
+      'gid'          => $grant->uid,
+      'grant_view'   => $grant->grant_view,
+      'grant_update' => $grant->grant_update,
+      'grant_delete' => $grant->grant_delete,
+      'priority'     => BOOK_ACCESS_GRANT_PRIORITY,
+    );
+  }
+}
+
+/**
+ * Checks if a user has access to the book passed as argument.
+ *
+ * @param $bid
+ *   The ID of the book to check.
+ * @param $grant
+ *   The permission to check for.
+ * @param $account
+ *   The user account for which the permission is checked; if it is not passed,
+ *   the permission is checked against the current logged in user.
+ *
+ * @return
+ *   TRUE if the user has the permission, FALSE otherwise.
+ */
+function book_access_grant_check($bid, $grant, $account = NULL) {
+  if (!isset($account)) {
+    $account = $GLOBALS['user'];
+  }
+
+  $roles = array_keys($account->roles);
+  $result = (
+    db_result(
+      db_query_range(
+        "SELECT 1 FROM {book_access_author} WHERE nid = %d AND uid = %d AND grant_$grant > 0",
+        $bid, $user->uid, 0, 1
+      )
+    ) ||
+    db_result(
+      db_query_range(
+        "SELECT 1 FROM {book_access_role} WHERE nid = %d AND rid IN (" . db_placeholders($roles) . ") AND grant_$grant > 0",
+        array_merge(array($bid), $roles), 0, 1
+      )
+    ) ||
+    db_result(
+      db_query_range(
+        "SELECT 1 FROM {book_access_user} WHERE nid = %d AND uid = %d AND grant_$grant > 0",
+        $bid, $user->uid, 0, 1
+      )
+    )
+  );
+
+  return $result;
+}
+
+/**
+ * Rebuilds the book page grants for the node passed as argument.
+ *
+ * @param $node
+ *   The node for which the grants needs to be rebuilt.
+ */
+function book_access_node_grants_build($node) {
   if (isset($node->book['bid'])) {
     $grants = array();
-    _book_access_node_access_records_roles($grants, $node->book['bid']);
+    book_access_author_records($grants, $node->book['bid']);
+    node_access_write_grants($node, $grants, 'book_access_author');
+
+    $grants = array();
+    book_access_role_records($grants, $node->book['bid']);
     node_access_write_grants($node, $grants, 'book_access_role');
 
     $grants = array();
-    _book_access_node_access_records_users($grants, $node->book['bid']);
+    book_access_user_records($grants, $node->book['bid']);
     node_access_write_grants($node, $grants, 'book_access_user');
   }
 }
 
-function _book_access_node_access_records_roles(&$grants, $bid) {
+/**
+ * Adds role grants to book pages.
+ *
+ * @param $bid
+ *   The book ID.
+ * @param $rids
+ *   An array of role IDs for which to add the book grants.
+ * @param $grants
+ *   An array of grants, in the format @code $grants[$grant][$rid] @endcode,
+ *   where @code $grant @endcode is a string between 'grant_view',
+ *   'grant_update', 'grant_delete', 'grant_admin_access', 'grant_add_child',
+ *   'grant_edit_outline', and @code $rid @endcode is the role ID.
+ */
+ function book_access_role_add($bid, array $rids, array $grants) {
+  $grant_ids = array(
+    'grant_view', 'grant_update', 'grant_delete',
+    'grant_admin_access', 'grant_add_child', 'grant_edit_outline',
+  );
+
+  $row = new stdClass();
+  $row->nid = $bid;
+
+  foreach ($rids as $rid) {
+    $row->rid = $rid;
+
+    $bool = db_result(
+      db_query_range(
+        "SELECT 1 FROM {book_access_role} WHERE nid = %d AND rid = %d",
+        $bid, $rid, 0, 1
+      )
+    );
+
+    foreach ($grant_ids as $id) {
+      $row->$id = !empty($grants[$id][$rid]);
+    }
+
+    drupal_write_record('book_access_role', $row, $bool ? array('nid', 'rid') : array());
+  }
+}
+
+/**
+ * Gets the list of grant records assigned to user roles for a book.
+ *
+ * @param $grants
+ *   An array of grants.
+ * @param $bid
+ *   The ID of the book for which the function returns the grant records.
+ */
+function book_access_role_records(&$grants, $bid) {
   $result = db_query('SELECT * FROM {book_access_role} WHERE nid = %d', $bid);
 
   while ($grant = db_fetch_object($result)) {
@@ -455,7 +536,59 @@ function _book_access_node_access_records_roles(&$grants, $bid) {
   }
 }
 
-function _book_access_node_access_records_users(&$grants, $bid) {
+/**
+ * Lists all the books to which the current user has access.
+ *
+ * @param $grant
+ *   A value between 'view', 'update', and 'delete'.
+ *
+ * @return
+ *   An array containing the node ID of the books to which the user has access.
+ */
+function book_access_user_books_list($grant) {
+  global $user;
+  $permitted_bids = array();
+
+  $query = db_query(
+    "SELECT nid FROM {book_access_author} WHERE uid = %d AND grant_$grant > 0",
+    $user->uid
+  );
+
+  while ($result = db_fetch_object($query)) {
+    $permitted_bids[$result->nid] = $result->nid;
+  }
+
+  $roles = array_keys($user->roles);
+  $query = db_query(
+    "SELECT nid FROM {book_access_role} WHERE rid IN (" . db_placeholders($roles) . ") AND grant_$grant > 0",
+    $roles
+  );
+
+  while ($result = db_fetch_object($query)) {
+    $permitted_bids[$result->nid] = $result->nid;
+  }
+
+  $query = db_query(
+    "SELECT nid FROM {book_access_user} WHERE uid = %d AND grant_$grant > 0",
+    $user->uid
+  );
+
+  while ($result = db_fetch_object($query)) {
+    $permitted_bids[$result->nid] = $result->nid;
+  }
+
+  return $permitted_bids;
+}
+
+/**
+ * Gets the list of grant records assigned to users for a book.
+ *
+ * @param $grants
+ *   An array of grants.
+ * @param $bid
+ *   The ID of the book for which the function returns the grant records.
+ */
+function book_access_user_records(&$grants, $bid) {
   $result = db_query("SELECT * FROM {book_access_user} WHERE nid = %d", $bid);
 
   while ($grant = db_fetch_object($result)) {
@@ -471,16 +604,64 @@ function _book_access_node_access_records_users(&$grants, $bid) {
 }
 
 /**
- * We don't want users to be able to add child pages to pages they do not
- * have 'update' grants for; therefore, we remove select options which point
- * to book pages user does not have that grant.
+ * Adds user grants to book pages.
+ *
+ * @param $bid
+ *   The book ID.
+ * @param $uids
+ *   An array of user IDs for which to add the book grants.
+ * @param $grants
+ *   An array of grants, in the format @code $grants[$grant][$uid] @endcode,
+ *   where @code $grant @endcode is a string between "grant_view",
+ *   'grant_update', 'grant_delete', 'grant_admin_access', 'grant_add_child',
+ *   'grant_edit_outline', and @code $uid @endcode is the user ID.
  */
-function _book_access_restrict_options(&$options) {
+function book_access_user_add($bid, array $uids, array $grants) {
+  $grant_ids = array(
+    'grant_view', 'grant_update', 'grant_delete',
+    'grant_admin_access', 'grant_add_child', 'grant_edit_outline',
+  );
+
+  foreach ($uids as $uid) {
+    if ($user = user_load($uid)) {
+      $bool = db_result(
+        db_query_range(
+          "SELECT 1 FROM {book_access_user} WHERE nid = %d AND uid = %d",
+          $bid, $user->uid, 0, 1
+        )
+      );
+      $row = new stdClass();
+      $row->nid = $bid;
+      $row->uid = $user->uid;
+
+      foreach ($grant_ids as $id) {
+        $row->$id = !empty($grants[$id][$uid]);
+      }
+
+      drupal_write_record('book_access_user', $row, $bool ? array('nid', 'uid') : array());
+    }
+  }
+}
+
+/**
+ * Restricts the options available to who moves book pages between books.
+ *
+ * We don't want users to be able to add child pages to pages they do not
+ * have update grants for; therefore, we remove select options which point
+ * to book pages user does not have that grant.
+ *
+ * @param $options
+ *   The options array used from book_outline_form() and the book edit form for
+ *   the list of books to which the page can be moved to.
+ *
+ * @see book_access_form_alter()
+ */
+function _book_access_options_restrict(&$options) {
   if (user_access('administer nodes')) {
     return;
   }
 
-  $permitted_bids = _book_access_user_books_list( 'update');
+  $permitted_bids = book_access_user_books_list('update');
 
   if (isset($options)) {
     foreach ($options as $bid => $value) {
@@ -489,33 +670,4 @@ function _book_access_restrict_options(&$options) {
       }
     }
   }
-}
-
-function _book_access_user_books_list($action) {
-  global $user;
-
-  $permitted_bids = array();
-  $roles = array_keys($user->roles);
-
-  $results = db_query(
-    "SELECT nid FROM {node_access} WHERE realm = 'book_access_role' AND gid IN (" .
-      db_placeholders($roles) . ") AND grant_" . $action . " > 0",
-    $roles
-  );
-
-  while ($result = db_fetch_object($results)) {
-    $permitted_bids[$result->nid] = $result->nid;
-  }
-
-  // Add in the per-user grants.
-  $results = db_query(
-    "SELECT nid FROM {node_access} WHERE realm = 'book_access_user' AND gid = %d AND grant_" . $action . " > 0",
-    $user->uid
-  );
-
-  while ($result = db_fetch_object($results)) {
-    $permitted_bids[$result->nid] = $result->nid;
-  }
-
-  return $permitted_bids;
 }

@@ -1,0 +1,7 @@
+; $Id$
+name = Book access UI
+description = User interface for the Book access module.
+package = Access control
+dependencies[] = book_access
+core = 6.x
+php = 5.2
