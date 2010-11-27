@@ -506,16 +506,19 @@ function book_access_update_6207() {
   $ret = array();
 
   module_enable(array('book_access_ui'));
+  drupal_rebuild_theme_registry();
 
   $ret[] = array(
     'success' => TRUE,
     'query' => 'Enabled the module book_access_ui.module',
   );
 
-  drupal_rebuild_theme_registry();
-
   return $ret;
 }
+
+/**
+ * Next update: 6209.
+ */
 
 /**
  * Implements hook_uninstall().

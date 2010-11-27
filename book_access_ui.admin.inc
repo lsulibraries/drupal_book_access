@@ -4,7 +4,7 @@
 /**
  * @file
  *
- * Administration interface for Book access module.
+ * Administration interface for the Book access module.
  */
 
 /**
@@ -16,11 +16,6 @@
  * @ingroup forms
  */
 function book_access_ui_grants_form($form_state, $node) {
-  $grant_ids = array(
-    'grant_view', 'grant_update', 'grant_delete',
-    'grant_admin_access', 'grant_add_child', 'grant_edit_outline',
-  );
-
   $bid = $node->book['bid'];
   $context = array('bid' => $bid, 'node' => clone $node);
   $form = array(
@@ -33,21 +28,14 @@ function book_access_ui_grants_form($form_state, $node) {
   $vars = new BookAccessVars();
 
   // Build the role access permissions for the book.
-
-  $grants = db_fetch_array(db_query_range(
-    'SELECT * FROM {book_access_author} WHERE nid = %d AND uid = %d',
-    $bid, $node->uid, 0, 1)
-  );
-
-  if (!grants) {
-    $default_author_access = array_filter($vars['book_access_default_author_access']);
-
-    foreach ($grant_ids as $id) {
-      $grants[$id] = !empty($default_author_access[$id]);
-    }
-  }
+  $grants = BookAccess::getAuthorGrants($bid, $node->uid, $vars['book_access_default_roles_access']);
+  $grants_copy = $grants;
 
   drupal_alter('book_access_author_grants', $grants, $context);
+
+  if ($grants != $grants_copy) {
+    _book_access_ui_permissions_warning();
+  }
 
   $form['author']['name'] = array(
    '#value' => t('author'),
@@ -83,45 +71,15 @@ function book_access_ui_grants_form($form_state, $node) {
     '#default_value' => !empty($grants['grant_edit_outline']),
   );
 
-  $grants = array(
-    'grant_view' => array(),
-    'grant_update' => array(),
-    'grant_delete' => array(),
-    'grant_admin_access' => array(),
-    'grant_add_child' => array(),
-    'grant_edit_outline' => array(),
-  );
-  $roles = user_roles();
-
-  $rids = array_keys($roles);
-  $result = db_query(
-    "SELECT * FROM {book_access_role} WHERE nid = %d AND rid IN (" . db_placeholders($rids) . ")",
-    array_merge(array($bid), $rids)
-  );
-
-  // Build the role access permissions for the book.
-  while ($book_access = db_fetch_object($result)) {
-    unset($roles[$book_access->rid]);
-
-    foreach ($grant_ids as $id) {
-      $grants[$id][$book_access->rid] = !empty($book_access->$id);
-    }
-  }
-
-  $default_roles_access = array_filter($vars['book_access_default_roles_access']);
-
-  // Set the default role access permissions for the roles that don't have
-  // access permissions already set.
-  foreach ($grant_ids as $id) {
-    foreach ($roles as $rid => $name) {
-      $grants[$id][$rid] = !empty($default_roles_access[$id]);
-    }
-  }
-
-  $roles = user_roles();
+  $grants = BookAccess::getRoleGrants($bid, $roles, $vars['book_access_default_roles_access']);
+  $grants_copy = $grants;
   $data = &$roles;
   $data['__drupal_alter_by_ref'] = array(&$grants);
   drupal_alter('book_access_roles_grants', $data, $context);
+
+  if ($grants != $grants_copy) {
+    _book_access_ui_permissions_warning();
+  }
 
   foreach ($roles as $rid => $name) {
     $form['#rids'][] = $rid;
@@ -161,32 +119,15 @@ function book_access_ui_grants_form($form_state, $node) {
     );
   }
 
-  $grants = array(
-    'grant_view' => array(),
-    'grant_update' => array(),
-    'grant_delete' => array(),
-    'grant_admin_access' => array(),
-    'grant_add_child' => array(),
-    'grant_edit_outline' => array(),
-  );
-  $uids = array();
-
-  $result = db_query(
-    "SELECT * FROM {book_access_user} bau INNER JOIN {users} u ON u.uid = bau.uid WHERE bau.nid = %d",
-    $bid
-  );
-  while ($book_access = db_fetch_object($result)) {
-    $uid = $book_access->uid;
-    $uids[$uid] = $uid;
-
-    foreach ($grant_ids as $id) {
-      $grants[$id][$uid] = !empty($book_access->$id);
-    }
-  }
-
+  $grants = BookAccess::getUserGrants($bid, $uids);
+  $grants_copy = $grants;
   $data = &$uids;
   $data['__drupal_alter_by_ref'] = array(&$grants);
   drupal_alter('book_access_users_grants', $data, $context);
+
+  if ($grants != $grants_copy) {
+    _book_access_ui_permissions_warning();
+  }
 
   foreach ($uids as $uid) {
     $form['#uids'][] = $uid;
@@ -290,7 +231,7 @@ function book_access_ui_user_add_submit($form, &$form_state) {
     $grants['grant_add_child'][$uid] = $form_state['values']['user']['grant_add_child'];
     $grants['grant_edit_outline'][$uid] = $form_state['values']['user']['grant_edit_outline'];
 
-    book_access_user_add($form['#bid'], array($uid), $grants);
+    BookAccess::addUserGrants($form['#bid'], array($uid), $grants);
     _book_access_ui_permissions_warning();
   }
   else {
@@ -306,24 +247,21 @@ function book_access_ui_user_add_submit($form, &$form_state) {
 function book_access_ui_grants_form_submit($form, &$form_state) {
   $bid = $form['#bid'];
 
-  db_query("DELETE FROM {book_access_author} WHERE nid = %d", $bid);
-  db_query("DELETE FROM {book_access_role} WHERE nid = %d", $bid);
-  db_query("DELETE FROM {book_access_user} WHERE nid = %d", $bid);
-
-  book_access_author_add($bid, $form['#author'], $form_state['values']['author']);
-  book_access_role_add($bid, $form['#rids'], $form_state['values']['roles']);
+  BookAccess::setAuthorGrants($bid, $form['#author'], $form_state['values']['author']);
+  BookAccess::setRoleGrants($bid, $form['#rids'], $form_state['values']['roles']);
 
   if (!empty($form['#uids'])) {
-    book_access_user_add($bid, $form['#uids'], $form_state['values']['users']);
+    BookAccess::setUserGrants($bid, $form['#uids'], $form_state['values']['users']);
   }
 
   $batch = array(
     'title' => t('Rebuilding book access permissions'),
     'operations' => array(
-      array('_book_access_rebuild_confirm_batch_operation', array($bid)),
+      array('_book_access_ui_rebuild_batch_operation', array($bid)),
     ),
-    'finished' => '_book_access_rebuild_confirm_batch_finished',
-    'file' => drupal_get_path('module', 'book_access') . '/book_access_admin.inc',
+    'finished' => '_book_access_ui_rebuild_batch_finished',
+    'progress_message' => '',
+    'file' => drupal_get_path('module', 'book_access') . '/book_access_ui.admin.inc',
   );
 
   batch_set($batch);
@@ -496,14 +434,14 @@ function theme_book_access_ui_settings($form) {
  * edit the book permissions that they need to save the settings.
  */
 function _book_access_ui_permissions_warning() {
-  drupal_set_message(t("The changes will not be saved until the <em>Save configuration</em> button is clicked."), 'warning');
+  drupal_set_message(t("The changes will not be saved until the <em>Save configuration</em> button is clicked."), 'warning', FALSE);
 }
 
 function _book_access_ui_rebuild_batch_operation($bid, &$context) {
   if (empty($context['sandbox'])) {
-    $context['sandbox']['progress'] = 0;
     $context['sandbox']['current_node'] = 0;
     $context['sandbox']['max'] = db_result(db_query('SELECT COUNT(DISTINCT nid) FROM {book} WHERE bid = %d', $bid));
+    $context['sandbox']['progress'] = 0;
   }
 
   $result = db_query_range(
@@ -512,14 +450,13 @@ function _book_access_ui_rebuild_batch_operation($bid, &$context) {
   );
 
   while ($row = db_fetch_array($result)) {
-    $loaded_node = node_load($row['nid'], NULL, TRUE);
-
-    if (!empty($loaded_node)) {
-      node_access_acquire_grants($loaded_node);
+    if ($node = node_load($row['nid'], NULL, TRUE)) {
+      node_access_acquire_grants($node);
+      $context['message'] = t('Rebuilding access permissions for %title', array('%title' => $node->title));
     }
+
     $context['sandbox']['progress']++;
     $context['sandbox']['current_node'] = $row['nid'];
-    $context['message'] = t('Rebuilding access permissions for %title', array('%title' => $loaded_node->title));
   }
 
   if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
