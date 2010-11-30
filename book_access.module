@@ -12,7 +12,7 @@ final class BookAccess {
   /**
    * The API version implemented by the module.
    */
-  const API_VERSION = '2.4';
+  const API_VERSION = '2.5';
 
   /**
    * The default priority used by the access grants implemented by the module.
@@ -37,12 +37,9 @@ final class BookAccess {
     $row->nid = $bid;
     $row->uid = $uid;
 
-    $bool = db_result(
-      db_query_range(
-        "SELECT 1 FROM {book_access_author} WHERE nid = %d AND uid = %d",
-        $bid, $uid, 0, 1
-      )
-    );
+    $bool = db_query_range(
+      "SELECT 1 FROM {book_access_author} WHERE nid = :nid AND uid = :uid",
+      0, 1, array(':nid' => $bid, ':uid' => $uid))->fetchField();
 
     foreach (self::grantIDs() as $id) {
       $row->$id = !empty($grants[$id]);
@@ -71,12 +68,10 @@ final class BookAccess {
     foreach ($rids as $rid) {
       $row->rid = $rid;
 
-      $bool = db_result(
-        db_query_range(
-          "SELECT 1 FROM {book_access_role} WHERE nid = %d AND rid = %d",
-          $bid, $rid, 0, 1
-        )
-      );
+      $bool = db_query_range(
+          "SELECT 1 FROM {book_access_role} WHERE nid = :nid AND rid = :rid",
+          0, 1, array(':nid' => $bid, ':rid' => $rid)
+        )->fetchField();
 
       foreach (self::grantIDs() as $id) {
         $row->$id = !empty($grants[$id][$rid]);
@@ -101,12 +96,11 @@ final class BookAccess {
    */
   public static function addUserGrants($bid, array $uids, array $grants) {
     foreach ($uids as $uid) {
-      $bool = db_result(
-        db_query_range(
-          "SELECT 1 FROM {book_access_user} WHERE nid = %d AND uid = %d",
-          $bid, $uid, 0, 1
-        )
-      );
+      $bool = db_query_range(
+        "SELECT 1 FROM {book_access_user} WHERE nid = :nid AND uid = :uid",
+        0, 1, array(':nid' => $bid, ':uid' => $uid)
+      )->fetchField();
+
       $row = new stdClass();
       $row->nid = $bid;
       $row->uid = $uid;
@@ -165,24 +159,18 @@ final class BookAccess {
 
     $roles = array_keys($account->roles);
     $result = (
-      db_result(
-        db_query_range(
-          "SELECT 1 FROM {book_access_author} WHERE nid = %d AND uid = %d AND grant_$grant > 0",
-          $bid, $account->uid, 0, 1
-        )
-      ) ||
-      db_result(
-        db_query_range(
-          "SELECT 1 FROM {book_access_role} WHERE nid = %d AND rid IN (" . db_placeholders($roles) . ") AND grant_$grant > 0",
-          array_merge(array($bid), $roles), 0, 1
-        )
-      ) ||
-      db_result(
-        db_query_range(
-          "SELECT 1 FROM {book_access_user} WHERE nid = %d AND uid = %d AND grant_$grant > 0",
-          $bid, $account->uid, 0, 1
-        )
-      )
+      db_query_range(
+        "SELECT 1 FROM {book_access_author} WHERE nid = :nid AND uid = :uid AND grant_$grant > 0",
+        0, 1, array(':nid' => $bid, ':uid' => $account->uid)
+      )->fetchField() ||
+      db_query_range(
+        "SELECT 1 FROM {book_access_role} WHERE nid = :nid AND rid IN (:rid) AND grant_$grant > 0",
+          0, 1, array(':nid' => $bid, ':rid' => $roles)
+        )->fetchField() ||
+      db_query_range(
+          "SELECT 1 FROM {book_access_user} WHERE nid = :nid AND uid = :uid AND grant_$grant > 0",
+          0, 1, array(':nid' => $bid, ':uid' => $account->uid)
+        )->fetchField()
     );
 
     return $result;
@@ -235,7 +223,9 @@ final class BookAccess {
     }
 
     foreach ($tables as $table) {
-      db_query("DELETE FROM {" . $table . "} WHERE $field = %d", $value);
+      db_delete($table)
+        ->condition($field, $value)
+        ->execute();
     }
   }
 
@@ -256,10 +246,9 @@ final class BookAccess {
    *   'grant_edit_outline'.
    */
   public static function getAuthorGrants($bid, $uid, array $defaults = array()) {
-    $grants = db_fetch_array(db_query_range(
-      'SELECT * FROM {book_access_author} WHERE nid = %d AND uid = %d',
-      $bid, $uid, 0, 1)
-    );
+    $grants = db_query_range(
+      'SELECT * FROM {book_access_author} WHERE nid = :nid AND uid = :uid',
+      0, 1, array(':nid' => $bid, ':uid' => $uid))->fetchAssoc();
 
     if (!grants) {
       $defaults = array_filter($defaults);
@@ -293,32 +282,32 @@ final class BookAccess {
     }
 
     foreach ($grants as $grant) {
-      $query = db_query(
-        "SELECT nid FROM {book_access_author} WHERE uid = %d AND grant_$grant > 0",
-        $account->uid
+      $result = db_query(
+        "SELECT nid FROM {book_access_author} WHERE uid = :uid AND grant_$grant > 0",
+        array(':uid' => $account->uid)
       );
 
-      while ($result = db_fetch_object($query)) {
-        $permitted_bids[$result->nid] = $result->nid;
+      foreach ($result as $book) {
+        $permitted_bids[$book->nid] = $book->nid;
       }
 
       $roles = array_keys($account->roles);
-      $query = db_query(
-        "SELECT nid FROM {book_access_role} WHERE rid IN (" . db_placeholders($roles) . ") AND grant_$grant > 0",
-        $roles
+      $result = db_query(
+        "SELECT nid FROM {book_access_role} WHERE rid IN (:rid) AND grant_$grant > 0",
+        array(':rid' => $roles)
       );
 
-      while ($result = db_fetch_object($query)) {
-        $permitted_bids[$result->nid] = $result->nid;
+      foreach ($result as $book) {
+        $permitted_bids[$book->nid] = $book->nid;
       }
 
-      $query = db_query(
-        "SELECT nid FROM {book_access_user} WHERE uid = %d AND grant_$grant > 0",
-        $account->uid
+      $result = db_query(
+        "SELECT nid FROM {book_access_user} WHERE uid = :uid AND grant_$grant > 0",
+        array(':uid' => $account->uid)
       );
 
-      while ($result = db_fetch_object($query)) {
-        $permitted_bids[$result->nid] = $result->nid;
+      foreach ($result as $book) {
+        $permitted_bids[$book->nid] = $book->nid;
       }
     }
 
@@ -414,12 +403,12 @@ final class BookAccess {
 
     $rids = array_keys($roles);
     $result = db_query(
-      "SELECT * FROM {book_access_role} WHERE nid = %d AND rid IN (" . db_placeholders($rids) . ")",
-      array_merge(array($bid), $rids)
+      "SELECT * FROM {book_access_role} WHERE nid = :nid AND rid IN (:rid)",
+      array(':nid' => $bid, ':rid' => $rids)
     );
 
     // Build the role access permissions for the book.
-    while ($access = db_fetch_object($result)) {
+    foreach ($result as $access) {
       unset($rcopy[$access->rid]);
 
       foreach (self::grantIDs() as $id) {
@@ -468,10 +457,10 @@ final class BookAccess {
     $uids = array();
 
     $result = db_query(
-      "SELECT * FROM {book_access_user} bau INNER JOIN {users} u ON u.uid = bau.uid WHERE bau.nid = %d",
-      $bid
+      "SELECT * FROM {book_access_user} bau INNER JOIN {users} u ON u.uid = bau.uid WHERE bau.nid = :nid",
+      array(':nid' => $bid)
     );
-    while ($access = db_fetch_object($result)) {
+    foreach ($result as $access) {
       $uid = $access->uid;
       $uids[$uid] = $uid;
 
@@ -537,7 +526,9 @@ final class BookAccess {
    *   'grant_edit_outline'.
    */
   public static function setAuthorGrants($bid, $uid, array $grants) {
-    db_query("DELETE FROM {book_access_author} WHERE nid = %d", $bid);
+    db_delete('book_access_author')
+      ->condition('nid', $bid)
+      ->execute();
     self::addAuthorGrants($bid, $uid, $grants);
   }
 
@@ -557,7 +548,9 @@ final class BookAccess {
    *   'grant_edit_outline', and @code $rid @endcode is the role ID.
    */
   public static function setRoleGrants($bid, array $rids, array $grants) {
-    db_query("DELETE FROM {book_access_role} WHERE nid = %d", $bid);
+    db_delete('book_access_role')
+      ->condition('nid', $bid)
+      ->execute();
     self::addRoleGrants($bid, $rids, $grants);
   }
 
@@ -577,7 +570,9 @@ final class BookAccess {
    *   'grant_edit_outline', and @code $uid @endcode is the user ID.
    */
   public static function setUserGrants($bid, array $uids, array $grants) {
-    db_query("DELETE FROM {book_access_user} WHERE nid = %d", $bid);
+    db_delete('book_access_user')
+      ->condition('nid', $bid)
+      ->execute();
     self::addUserGrants($bid, $uids, $grants);
   }
 
@@ -586,16 +581,14 @@ final class BookAccess {
    *
    * @param $bid
    *   The book ID.
-   * @param $field
-   *   The field to update.
-   * @param $value
-   *   The value to set for the field.
+   * @param $fields
+   *   The fields to update.
    * @param $types
    *   An array containing the grant types; the currently used values are
    *   'author', 'role', 'user'. It is responsibility of the caller to use
    *   values for $types for which $field is valid.
    */
-  public static function updateGrants($bid, $field, $value, array $types = array('author', 'role', 'user')) {
+  public static function updateGrants($bid, array $fields, array $types = array('author', 'role', 'user')) {
     foreach ($types as $type) {
       switch ($type) {
         case 'author':
@@ -609,7 +602,10 @@ final class BookAccess {
       }
 
       if ($table) {
-        db_query("UPDATE {" . $table . "} SET $field = %d WHERE nid = %d", $value, $bid);
+        db_update($table)
+          ->fields($fields)
+          ->condition('nid', $bid)
+          ->execute();
       }
     }
   }
@@ -653,12 +649,7 @@ class BookAccessVars extends Vars {
    * Constructs a BookAccessVars object.
    */
   public function __construct() {
-   parent::__construct('book_access', array(
-     'sysVars' => array(
-       'menu_rebuild_needed' => FALSE,
-       'book_child_type' => 'book',
-     )
-   ));
+   parent::__construct('book_access');
   }
 
   /**
@@ -840,40 +831,41 @@ function book_access_node_grants($account, $op) {
 }
 
 /**
- * Implements hook_nodeapi().
+ * Implements hook_node_delete().
  */
-function book_access_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
-  if (!empty($node->nid)) {
-    switch ($op) {
-      case 'delete':
-        BookAccess::deleteGrants($node->nid);
-        break;
-
-      case 'update':
-        BookAccess::updateGrants($node->nid, 'uid', $node->uid, array('author'));
-        break;
-    }
-  }
+function book_access_node_delete($node) {
+  BookAccess::deleteGrants($node->nid);
 }
 
 /**
- * Implements hook_perm().
+ * Implements hook_node_update().
  */
-function book_access_perm() {
+function book_access_node_update($node) {
+  BookAccess::deleteGrants($node->nid);
+}
+
+/**
+ * Implements hook_permission().
+ */
+function book_access_permission() {
   return array(
-    'administer book access',
-    'administer access of any books',
-    'administer access of own books',
+    'administer book access' => array(
+      'title' => t('Administer book access')
+    ),
+    'administer access of any book' => array(
+      'title' => t('Administer access of any book')
+    ),
+    'administer access of own books' => array(
+      'title' => t('Administer access of own books')
+    ),
   );
 }
 
 /**
- * Implements hook_user().
+ * Implements hook_user_delete().
  */
-function book_access_user($op, &$edit, &$account, $category = NULL) {
-  if ($op == 'delete') {
-    BookAccess::deleteGrants($account->uid, 'uid');
-  }
+function book_access_user_delete($account) {
+  BookAccess::deleteGrants($account->uid, 'uid');
 }
 
 /**

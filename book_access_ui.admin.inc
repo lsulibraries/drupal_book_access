@@ -73,9 +73,7 @@ function book_access_ui_grants_form($form_state, $node) {
 
   $grants = BookAccess::getRoleGrants($bid, $roles, $vars['book_access_default_roles_access']);
   $grants_copy = $grants;
-  $data = &$roles;
-  $data['__drupal_alter_by_ref'] = array(&$grants);
-  drupal_alter('book_access_roles_grants', $data, $context);
+  drupal_alter('book_access_roles_grants', $roles, $grants, $context);
 
   if ($grants != $grants_copy) {
     _book_access_ui_permissions_warning();
@@ -121,9 +119,7 @@ function book_access_ui_grants_form($form_state, $node) {
 
   $grants = BookAccess::getUserGrants($bid, $uids);
   $grants_copy = $grants;
-  $data = &$uids;
-  $data['__drupal_alter_by_ref'] = array(&$grants);
-  drupal_alter('book_access_users_grants', $data, $context);
+  drupal_alter('book_access_users_grants', $uids, $grants, $context);
 
   if ($grants != $grants_copy) {
     _book_access_ui_permissions_warning();
@@ -221,9 +217,11 @@ function book_access_ui_grants_form($form_state, $node) {
  * @see book_access_ui_grants_form()
  */
 function book_access_ui_user_add_submit($form, &$form_state) {
-  if ($user = user_load(array('name' => $form_state['values']['user']['username']))) {
-    $uid = $user->uid;
+  $username = $form_state['values']['user']['username'];
+
+  if ($user = user_load_by_name($username)) {
     $grants = array();
+    $uid = $user->uid;
     $grants['grant_view'][$uid] = $form_state['values']['user']['grant_view'];
     $grants['grant_update'][$uid] = $form_state['values']['user']['grant_update'];
     $grants['grant_delete'][$uid] = $form_state['values']['user']['grant_delete'];
@@ -300,10 +298,10 @@ function book_access_ui_user_permissions_remove($form_state, $node, $user) {
  * @see book_access_ui_user_permissions_remove()
  */
 function book_access_ui_user_permissions_remove_submit($form, &$form_state) {
-  db_query(
-    "DELETE FROM {book_access_user} WHERE nid = %d AND uid = %d",
-    $form['#bid'], $form['#uid']
-  );
+  db_delete('book_access_user')
+    ->condition('nid', $form['#bid'])
+    ->condition('uid', $form['#uid'])
+    ->execute();
 
   _book_access_ui_permissions_warning();
 
@@ -440,17 +438,19 @@ function _book_access_ui_permissions_warning() {
 function _book_access_ui_rebuild_batch_operation($bid, &$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['current_node'] = 0;
-    $context['sandbox']['max'] = db_result(db_query('SELECT COUNT(DISTINCT nid) FROM {book} WHERE bid = %d', $bid));
+    $context['sandbox']['max'] = db_query('SELECT COUNT(DISTINCT nid) FROM {book} WHERE bid = :bid', array(':bid' => $bid))->fetchField();
     $context['sandbox']['progress'] = 0;
   }
 
-  $result = db_query_range(
-    "SELECT nid FROM {book} WHERE nid > %d AND bid = %d ORDER BY nid ASC",
-    $context['sandbox']['current_node'], $bid, 0, 20
-  );
+  $result = db_select('book')
+    ->condition('nid', $context['sandbox']['current_node'], '>')
+    ->condition('bid', $bid)
+    ->orderBy('nid')
+    ->range(0, 20)
+    ->execute();
 
-  while ($row = db_fetch_array($result)) {
-    if ($node = node_load($row['nid'], NULL, TRUE)) {
+  foreach ($result as $row) {
+    if ($node = node_load($row->nid, NULL, TRUE)) {
       node_access_acquire_grants($node);
       $context['message'] = t('Rebuilding access permissions for %title', array('%title' => $node->title));
     }

@@ -8,6 +8,20 @@
  */
 
 /**
+ * Implements hook_admin_paths().
+ */
+function book_access_ui_admin_paths() {
+  $paths = array();
+  $vars = new BookAccessVars();
+
+  if ($vars['node_admin_theme']) {
+    $paths['node/*/book_access'] = TRUE;
+  }
+
+  return $paths;
+}
+
+/**
  * Implements hook_form_FORM_ID_alter() for book_admin_settings().
  *
  * @see theme_book_access_ui_settings()
