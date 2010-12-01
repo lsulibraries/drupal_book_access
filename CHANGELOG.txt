@@ -9,10 +9,6 @@
 ----------
 #362291 by kiam: How about a SimpleTest for Book Access?
 
-2010-10-10
-----------
-#362291 by kiam: How about a SimpleTest for Book Access?
-
 2010-09-25
 ----------
 #842992 by kiam: Book Access API.
