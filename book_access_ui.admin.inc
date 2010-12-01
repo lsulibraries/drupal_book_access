@@ -311,13 +311,15 @@ function book_access_ui_user_permissions_remove_submit($form, &$form_state) {
 /**
  * Themes the permission tab added to each book.
  *
- * @param $form
- *   The form to render.
+ * @param $variables
+ *   An associative array containing:
+ *     - form: A render element representing the form.
  *
  * @see book_access_ui_grants_form()
  * @ingroup themeable
  */
-function theme_book_access_ui_grants_form($form) {
+function theme_book_access_ui_grants_form($variables) {
+  $form = $variables['form'];
   $rows = array();
 
   if ($form['#author']) {
@@ -390,19 +392,21 @@ function theme_book_access_ui_grants_form($form) {
     t('Operations'),
   );
 
-  return theme('table', $header, $rows) . drupal_render($form);
+  return theme('table', $header, $rows) . drupal_render_children($form);
 }
 
 /**
  * Themes the settings fieldset added to the book settings page.
  *
- * @param $form
- *   The form to render.
+ * @param $variables
+ *   An associative array containing:
+ *     - form: A render element representing the form.
  *
  * @see book_access_ui_form_book_admin_settings_alter()
  * @ingroup themeable
  */
-function theme_book_access_ui_settings($form) {
+function theme_book_access_ui_settings($variables) {
+  $form = $variables['form'];
   $header = array(t('Access type'));
   $options = $form['#options'];
   $rows = array();
@@ -424,7 +428,7 @@ function theme_book_access_ui_settings($form) {
     $rows[] = $row;
   }
 
-  return drupal_render($form['info']) . theme('table', $header, $rows) . drupal_render($form);
+  return drupal_render($form['info']) . theme('table', $header, $rows) . drupal_render_children($form);
 }
 
 /**

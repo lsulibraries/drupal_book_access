@@ -698,12 +698,15 @@ function book_access_form_alter(&$form, &$form_state, $form_id) {
 }
 
 /**
- * Implements hook_link_alter().
+ * Implements hook_node_view_alter().
  *
  * Enables the link "Add child page" only for users who have the right
  * permission.
  */
-function book_access_link_alter(&$links, $node) {
+function book_access_node_view_alter(&$build) {
+  $links = $build['links']['#links'];
+  $node = $build['#node'];
+
   if (user_access('administer nodes')) {
     return;
   }
@@ -731,16 +734,16 @@ function book_access_link_alter(&$links, $node) {
 /**
  * Implements hook_menu_alter().
  *
- * @see book_access_outline_access()
+ * @see _book_access_outline_access()
  * @see book_access_outline_remove_access()
  */
 function book_access_menu_alter(&$items) {
   if (isset($items['node/%node/outline'])) {
-    $items['node/%node/outline']['access callback'] = 'book_access_outline_access';
+    $items['node/%node/outline']['access callback'] = '_book_access_outline_access';
   }
 
   if (isset($items['node/%node/outline/remove'])) {
-    $items['node/%node/outline/remove']['access callback'] = 'book_access_outline_remove_access';
+    $items['node/%node/outline/remove']['access callback'] = '_book_access_outline_remove_access';
   }
 }
 
@@ -818,6 +821,13 @@ function book_access_node_access_explain($row) {
 }
 
 /**
+ * Implements hook_node_delete().
+ */
+function book_access_node_delete($node) {
+  BookAccess::deleteGrants($node->nid);
+}
+
+/**
  * Implements hook_node_grants().
  */
 function book_access_node_grants($account, $op) {
@@ -828,13 +838,6 @@ function book_access_node_grants($account, $op) {
   $grants['book_access_user'] = array($account->uid);
 
   return $grants;
-}
-
-/**
- * Implements hook_node_delete().
- */
-function book_access_node_delete($node) {
-  BookAccess::deleteGrants($node->nid);
 }
 
 /**
@@ -869,40 +872,6 @@ function book_access_user_delete($account) {
 }
 
 /**
- * Determines if the outline tab is accessible.
- *
- * @see book_access_menu_alter()
- */
-function book_access_outline_access($node) {
-  if (!isset($node->book['bid'])) {
-    return FALSE;
-  }
-
-  $view_access = node_access('view', $node);
-
-  if (user_access('administer book outlines') && $view_access) {
-    return TRUE;
-  }
-
-  return BookAccess::checkGrant($node->book['bid'], 'edit_outline') && $view_access;
-}
-
-/**
- * Determines if the user can remove nodes from the outline.
- *
- * @see book_access_menu_alter()
- */
-function book_access_outline_remove_access($node) {
-  $bool = (
-    isset($node->book['bid']) &&
-    ($node->book['bid'] != $node->nid) &&
-    book_access_outline_access($node)
-  );
-
-  return $bool;
-}
-
-/**
  * Form submission callback for node_form(), and book_outline_form().
  *
  * @see node_form()
@@ -923,4 +892,38 @@ function book_access_outline_form_submit($form, &$form_state) {
   if (isset($form['plid']) && $form['plid'] != $form_state['values']['plid']) {
     BookAccess::writeGrantRecords($form['#node']);
   }
+}
+
+/**
+ * Determines if the outline tab is accessible.
+ *
+ * @see book_access_menu_alter()
+ */
+function _book_access_outline_access($node) {
+  if (!isset($node->book['bid'])) {
+    return FALSE;
+  }
+
+  $view_access = node_access('view', $node);
+
+  if (user_access('administer book outlines') && $view_access) {
+    return TRUE;
+  }
+
+  return BookAccess::checkGrant($node->book['bid'], 'edit_outline') && $view_access;
+}
+
+/**
+ * Determines if the user can remove nodes from the outline.
+ *
+ * @see book_access_menu_alter()
+ */
+function _book_access_outline_remove_access($node) {
+  $bool = (
+    isset($node->book['bid']) &&
+    ($node->book['bid'] != $node->nid) &&
+    _book_access_outline_access($node)
+  );
+
+  return $bool;
 }

@@ -44,13 +44,27 @@ class BookAccessRuleTestCase extends DrupalWebTestCase {
    * @param $parent
    *   Parent book ID.
    */
-  protected function createBookNode($bid) {
-    $settings = array('type' => 'book',
-      'title' => $this->randomName(10) . ' - book access test node: ' . $this->randomName(10),
-      'body' => 'Book access test body ' . $this->randomName(32) . ' (' . $this->randomName(32) .').',
-      'book' => array('bid' => $bid)
-    );
-    return $this->drupalCreateNode($settings);
+  /**
+   * Create book node.
+   *
+   * @param integer $book_nid Book node id or set to 'new' to create new book.
+   * @param integer $parent Parent book reference id.
+   */
+  function createBookNode($bid) {
+    $edit = array();
+    $langcode = LANGUAGE_NONE;
+
+    $edit["title"] = $this->randomName(10) . ' - book access test node: ' . $this->randomName(10);
+    $edit["body[$langcode][0][value]"] = 'Book access test body ' . $this->randomName(32) . ' (' . $this->randomName(32) .').';
+    $edit['book[bid]'] = $bid;
+
+    $this->drupalPost('node/add/book', $edit, t('Save'));
+
+    // Check to make sure the book node was created.
+    $node = $this->drupalGetNodeByTitle($edit['title']);
+    $this->assertTrue($node !== FALSE, t('Book node found in database.'));
+
+    return $node;
   }
 
   function testAuthorAccess() {

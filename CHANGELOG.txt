@@ -1,6 +1,10 @@
 # $Id$
 # All the dates reported here are referred to UTC.
 
+2010-12-01
+----------
+#900208 by kiam: Drupal 7 port.
+
 2010-10-26
 ----------
 #362291 by kiam: How about a SimpleTest for Book Access?

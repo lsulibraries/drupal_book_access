@@ -160,11 +160,11 @@ function book_access_ui_menu() {
 function book_access_ui_theme() {
   return array(
     'book_access_ui_grants_form' => array(
-      'arguments' => array('form' => array()),
+      'render element' => 'form',
       'file' => 'book_access_ui.admin.inc',
     ),
     'book_access_ui_settings' => array(
-      'arguments' => array('form' => array()),
+      'render element' => 'form',
       'file' => 'book_access_ui.admin.inc',
     ),
   );
