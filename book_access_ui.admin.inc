@@ -37,9 +37,18 @@ function book_access_ui_grants_form($form_state, $node) {
     _book_access_ui_permissions_warning();
   }
 
-  $form['author']['name'] = array(
-   '#value' => t('author'),
-  );
+  $author = user_load($node->uid);
+
+  if ($author) {
+    $form['author']['name'] = array(
+      '#value' => t('!author-href (author)', array('!author-href' => theme('username', array('account' => $author)))),
+    );
+  }
+  else {
+    $form['author']['name'] = array(
+      '#value' => t('author'),
+    );
+  }
 
   $form['author']['grant_view'] = array(
     '#type' => 'checkbox',
@@ -357,7 +366,7 @@ function theme_book_access_ui_grants_form($variables) {
       $row = array();
       $user = user_load($key);
 
-      $row[] = theme('username', $user);
+      $row[] = theme('username', array('account' => $user));
       $row[] = drupal_render($form['users']['grant_admin_access'][$key]);
       $row[] = drupal_render($form['users']['grant_update'][$key]);
       $row[] = drupal_render($form['users']['grant_delete'][$key]);

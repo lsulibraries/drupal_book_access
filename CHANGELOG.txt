@@ -3,6 +3,7 @@
 
 2010-12-04
 ----------
+#987416 by kiam: Display the name of the book author on the outline permissions tab.
 #987508 by kiam: Installation file has not been updated to Drupal 7.
 
 2010-12-01
