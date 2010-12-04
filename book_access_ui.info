@@ -2,5 +2,7 @@
 name = Book access UI
 description = User interface for the Book access module.
 package = Access control
-dependencies[] = book_access
 core = 7.x
+dependencies[] = book_access
+files[] = book_access_ui.module
+files[] = book_access_ui.admin.inc

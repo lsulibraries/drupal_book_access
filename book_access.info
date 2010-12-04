@@ -2,6 +2,8 @@
 name = Book access
 description = Allows setting the access control for book nodes on a per book basis.
 package = Access control
+core = 7.x
 dependencies[] = book
 dependencies[] = vars (2.x)
-core = 7.x
+files[] = book_access.install
+files[] = book_access.module
