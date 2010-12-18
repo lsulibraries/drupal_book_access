@@ -620,7 +620,7 @@ final class BookAccess {
    *   'author', 'role', 'user'.
    */
   public static function writeGrantRecords($node, array $types = array('author', 'role', 'user')) {
-    if (isset($node->book['bid'])) {
+    if (!empty($node->book['bid'])) {
       foreach ($types as $type) {
         switch ($type) {
           case 'author':
@@ -711,7 +711,7 @@ function book_access_node_view_alter(&$build) {
     return;
   }
 
-  if (isset($node->book['bid']) && isset($links['book_add_child'])) {
+  if (!empty($node->book['bid']) && !empty($links['book_add_child'])) {
     $vars = new BookAccessVars();
 
     $bool = (
@@ -813,7 +813,7 @@ function book_access_node_access_explain($row) {
  function book_access_node_access_records($node) {
   $grants = array();
 
-  if (isset($node->book['bid'])) {
+  if (!empty($node->book['bid'])) {
     $grants = BookAccess::getGrantRecords($node->book['bid']);
   }
 
@@ -900,7 +900,7 @@ function book_access_outline_form_submit($form, &$form_state) {
  * @see book_access_menu_alter()
  */
 function _book_access_outline_access($node) {
-  if (!isset($node->book['bid'])) {
+  if (empty($node->book['bid'])) {
     return FALSE;
   }
 
@@ -920,7 +920,7 @@ function _book_access_outline_access($node) {
  */
 function _book_access_outline_remove_access($node) {
   $bool = (
-    isset($node->book['bid']) &&
+    !empty($node->book['bid']) &&
     ($node->book['bid'] != $node->nid) &&
     _book_access_outline_access($node)
   );

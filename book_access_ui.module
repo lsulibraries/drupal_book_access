@@ -178,7 +178,7 @@ function book_access_ui_theme() {
 function book_access_ui_grants_form_access($node) {
   global $user;
 
-  if (isset($node->book['bid'])) {
+  if (!empty($node->book['bid'])) {
     if (user_access('administer nodes') || user_access('administer book access')) {
       return TRUE;
     }
