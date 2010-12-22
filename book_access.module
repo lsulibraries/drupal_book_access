@@ -356,7 +356,10 @@ final class BookAccess {
     }
 
     foreach ($info as $data) {
-      $result = db_query("SELECT * FROM {" . $data['table'] . "} WHERE nid = %d", $bid);
+      $result = db_query(
+        "SELECT * FROM {" . db_escape_table($data['table']) . "} WHERE nid = :nid",
+        array(':nid' => $bid)
+      );
 
       while ($grant = db_fetch_object($result)) {
         $grants[] = array(
