@@ -361,7 +361,7 @@ final class BookAccess {
         array(':nid' => $bid)
       );
 
-      while ($grant = db_fetch_object($result)) {
+      foreach ($result as $grant) {
         $grants[] = array(
           'realm' => $data['table'],
           'gid' => $grant->{$data['gid']},
