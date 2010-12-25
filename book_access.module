@@ -250,7 +250,7 @@ final class BookAccess {
       'SELECT * FROM {book_access_author} WHERE nid = :nid AND uid = :uid',
       0, 1, array(':nid' => $bid, ':uid' => $uid))->fetchAssoc();
 
-    if (!grants) {
+    if (!$grants) {
       $defaults = array_filter($defaults);
 
       foreach (self::grantIDs() as $id) {
