@@ -719,13 +719,15 @@ function book_access_node_view_alter(&$build) {
 
     $bool = (
       (
-        user_access('add content to books') ||
-        user_access('administer book outlines') ||
-        BookAccess::checkGrant($node->book['bid'], 'add_child')
+        (
+          user_access('add content to books') &&
+          BookAccess::checkGrant($node->book['bid'], 'add_child')
+        ) ||
+        user_access('administer book outlines')
       ) &&
       node_access('create', $vars['book_child_type']) &&
-      $node->status == 1 &&
-      $node->book['depth'] < MENU_MAX_DEPTH
+      ($node->status == 1) &&
+      ($node->book['depth'] < MENU_MAX_DEPTH)
     );
 
     if (!$bool) {
