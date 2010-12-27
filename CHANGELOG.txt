@@ -1,6 +1,10 @@
 # $Id$
 # All the dates reported here are referred to UTC.
 
+2010-12-27
+----------
+#1005482 by kiam: After creating new book page in permitted book, book access shows all books.
+
 2010-12-22
 ----------
 #1004260 by kiam: A call to db_query() uses wrong parameters and doesn't pass the table name to db_escape_table().

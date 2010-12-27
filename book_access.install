@@ -232,10 +232,23 @@ function book_access_schema() {
  * Implements hook_install().
  */
 function book_access_install() {
-  db_query("UPDATE {system} SET weight = 2 WHERE name = 'book_access'");
+  db_update('system')
+    ->fields(array('weight' => 2))
+    ->condition('name', 'book_access')
+    ->execute();
 
   $vars = new BookAccessVars();
   $vars->saveDefaults();
+}
+
+/**
+ * Removes spurius entries in the node access tables that cause users to see
+ * books they should not see.
+ */
+function book_access_update_7200() {
+  db_delete('node_access')
+    ->condition('nid', 0)
+    ->execute();
 }
 
 /**

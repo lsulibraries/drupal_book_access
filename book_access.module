@@ -144,7 +144,7 @@ final class BookAccess {
    * @param $bid
    *   The ID of the book to check.
    * @param $grant
-   *   The permission to check for.
+   *   The permission to check for.d
    * @param $account
    *   The user account for which the permission is checked; if it is not passed,
    *   the permission is checked against the current logged in user.
@@ -623,7 +623,7 @@ final class BookAccess {
    *   'author', 'role', 'user'.
    */
   public static function writeGrantRecords($node, array $types = array('author', 'role', 'user')) {
-    if (!empty($node->book['bid'])) {
+    if (!empty($node->nid) && !empty($node->book['bid'])) {
       foreach ($types as $type) {
         switch ($type) {
           case 'author':
