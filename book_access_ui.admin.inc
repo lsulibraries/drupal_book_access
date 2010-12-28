@@ -15,207 +15,184 @@
  * @see theme_book_access_ui_grants_form()
  * @ingroup forms
  */
-function book_access_ui_grants_form($form_state, $node) {
-  $bid = $node->book['bid'];
-  $context = array('bid' => $bid, 'node' => clone $node);
-  $form = array(
-    '#bid' => $bid,
-    '#author' => $node->uid,
-    '#rids' => array(),
-    '#uids' => array(),
-    '#tree' => TRUE,
-  );
-  $vars = new BookAccessVars();
+function book_access_ui_grants_form($form, &$form_state, $node) {
+  if (!empty($node->book['bid'])) {
+    $bid = $node->book['bid'];
+    $context = array('bid' => $bid, 'node' => clone $node);
+    $form = array(
+      '#bid' => $bid,
+      '#author' => $node->uid,
+      '#rids' => array(),
+      '#uids' => array(),
+      '#tree' => TRUE,
+    );
+    $vars = new BookAccessVars();
 
-  // Build the role access permissions for the book.
-  $grants = BookAccess::getAuthorGrants($bid, $node->uid, $vars['book_access_default_roles_access']);
-  $grants_copy = $grants;
+    // Build the role access permissions for the book.
+    $grants = BookAccess::getAuthorGrants($bid, $node->uid, $vars['book_access_default_roles_access']);
+    $grants_copy = $grants;
 
-  drupal_alter('book_access_author_grants', $grants, $context);
+    drupal_alter('book_access_author_grants', $grants, $context);
 
-  if ($grants != $grants_copy) {
-    _book_access_ui_permissions_warning();
+    if ($grants != $grants_copy) {
+      _book_access_ui_permissions_warning();
+    }
+
+    $author = user_load($node->uid);
+
+    if ($author) {
+      $form['author']['name'] = array(
+        '#markup' => t('!author-href (author)', array('!author-href' => theme('username', array('account' => $author)))),
+      );
+    }
+    else {
+      $form['author']['name'] = array(
+        '#markup' => t('author'),
+      );
+    }
+
+    $form['author']['grant_view'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_view']),
+    );
+    $form['author']['grant_update'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_update']),
+    );
+    $form['author']['grant_delete'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_delete']),
+    );
+    $form['author']['grant_admin_access'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_admin_access']),
+    );
+    $form['author']['grant_add_child'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_add_child']),
+    );
+    $form['author']['grant_edit_outline'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_edit_outline']),
+    );
+
+    $grants = BookAccess::getRoleGrants($bid, $roles, $vars['book_access_default_roles_access']);
+    $grants_copy = $grants;
+    drupal_alter('book_access_roles_grants', $roles, $grants, $context);
+
+    if ($grants != $grants_copy) {
+      _book_access_ui_permissions_warning();
+    }
+
+    foreach ($roles as $rid => $name) {
+      $form['#rids'][] = $rid;
+      $form['roles']['names'][$rid] = array(
+        '#markup' => check_plain($name),
+      );
+      $form['roles']['grant_view'][$rid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_view'][$rid]),
+      );
+      $form['roles']['grant_update'][$rid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_update'][$rid]),
+      );
+      $form['roles']['grant_delete'][$rid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_delete'][$rid]),
+      );
+      $form['roles']['grant_admin_access'][$rid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_admin_access'][$rid]),
+      );
+      $form['roles']['grant_add_child'][$rid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_add_child'][$rid]),
+      );
+      $form['roles']['grant_edit_outline'][$rid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_edit_outline'][$rid]),
+      );
+    }
+
+    $grants = BookAccess::getUserGrants($bid, $uids);
+    $grants_copy = $grants;
+    drupal_alter('book_access_users_grants', $uids, $grants, $context);
+
+    if ($grants != $grants_copy) {
+      _book_access_ui_permissions_warning();
+    }
+
+    foreach ($uids as $uid) {
+      $form['#uids'][] = $uid;
+      $form['users']['grant_view'][$uid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_view'][$uid]),
+      );
+      $form['users']['grant_update'][$uid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_update'][$uid]),
+      );
+      $form['users']['grant_delete'][$uid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_delete'][$uid]),
+      );
+      $form['users']['grant_admin_access'][$uid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_admin_access'][$uid]),
+      );
+      $form['users']['grant_add_child'][$uid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_add_child'][$uid]),
+      );
+      $form['users']['grant_edit_outline'][$uid] = array(
+        '#type' => 'checkbox',
+        '#default_value' => !empty($grants['grant_edit_outline'][$uid]),
+      );
+    }
+
+    $form['user']['username'] = array(
+      '#type' => 'textfield',
+      '#size' => 20,
+      '#autocomplete_path' => 'user/autocomplete',
+    );
+
+    $grants = array_filter($vars['book_access_default_users_access']);
+
+    $form['user']['grant_view'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_view']),
+    );
+    $form['user']['grant_update'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_update']),
+    );
+    $form['user']['grant_delete'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_delete']),
+    );
+    $form['user']['grant_admin_access'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_admin_access']),
+    );
+    $form['user']['grant_add_child'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_add_child']),
+    );
+    $form['user']['grant_edit_outline'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => !empty($grants['grant_edit_outline']),
+    );
+    $form['user']['add_user'] = array(
+      '#type'  => 'submit',
+      '#value' => t('Add user'),
+      '#submit' => array('book_access_ui_user_add_submit'),
+    );
+    $form['submit'] = array(
+      '#type'  => 'submit',
+      '#value' => t('Save configuration'),
+    );
   }
-
-  $author = user_load($node->uid);
-
-  if ($author) {
-    $form['author']['name'] = array(
-      '#value' => t('!author-href (author)', array('!author-href' => theme('username', array('account' => $author)))),
-    );
-  }
-  else {
-    $form['author']['name'] = array(
-      '#value' => t('author'),
-    );
-  }
-
-  $form['author']['grant_view'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_view']),
-  );
-
-  $form['author']['grant_update'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_update']),
-  );
-
-  $form['author']['grant_delete'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_delete']),
-  );
-
-  $form['author']['grant_admin_access'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_admin_access']),
-  );
-
-  $form['author']['grant_add_child'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_add_child']),
-  );
-
-  $form['author']['grant_edit_outline'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_edit_outline']),
-  );
-
-  $grants = BookAccess::getRoleGrants($bid, $roles, $vars['book_access_default_roles_access']);
-  $grants_copy = $grants;
-  drupal_alter('book_access_roles_grants', $roles, $grants, $context);
-
-  if ($grants != $grants_copy) {
-    _book_access_ui_permissions_warning();
-  }
-
-  foreach ($roles as $rid => $name) {
-    $form['#rids'][] = $rid;
-
-    $form['roles']['names'][$rid] = array(
-      '#value' => check_plain($name),
-    );
-
-    $form['roles']['grant_view'][$rid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_view'][$rid]),
-    );
-
-    $form['roles']['grant_update'][$rid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_update'][$rid]),
-    );
-
-    $form['roles']['grant_delete'][$rid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_delete'][$rid]),
-    );
-
-    $form['roles']['grant_admin_access'][$rid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_admin_access'][$rid]),
-    );
-
-    $form['roles']['grant_add_child'][$rid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_add_child'][$rid]),
-    );
-
-    $form['roles']['grant_edit_outline'][$rid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_edit_outline'][$rid]),
-    );
-  }
-
-  $grants = BookAccess::getUserGrants($bid, $uids);
-  $grants_copy = $grants;
-  drupal_alter('book_access_users_grants', $uids, $grants, $context);
-
-  if ($grants != $grants_copy) {
-    _book_access_ui_permissions_warning();
-  }
-
-  foreach ($uids as $uid) {
-    $form['#uids'][] = $uid;
-
-    $form['users']['grant_view'][$uid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_view'][$uid]),
-    );
-
-    $form['users']['grant_update'][$uid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_update'][$uid]),
-    );
-
-    $form['users']['grant_delete'][$uid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_delete'][$uid]),
-    );
-
-    $form['users']['grant_admin_access'][$uid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_admin_access'][$uid]),
-    );
-
-    $form['users']['grant_add_child'][$uid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_add_child'][$uid]),
-    );
-
-    $form['users']['grant_edit_outline'][$uid] = array(
-      '#type' => 'checkbox',
-      '#default_value' => !empty($grants['grant_edit_outline'][$uid]),
-    );
-  }
-
-  $form['user']['username'] = array(
-    '#type' => 'textfield',
-    '#size' => 20,
-    '#autocomplete_path' => 'user/autocomplete',
-  );
-
-  $grants = array_filter($vars['book_access_default_users_access']);
-
-  $form['user']['grant_view'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_view']),
-  );
-
-  $form['user']['grant_update'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_update']),
-  );
-
-  $form['user']['grant_delete'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_delete']),
-  );
-
-  $form['user']['grant_admin_access'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_admin_access']),
-  );
-
-  $form['user']['grant_add_child'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_add_child']),
-  );
-
-  $form['user']['grant_edit_outline'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => !empty($grants['grant_edit_outline']),
-  );
-
-  $form['user']['add_user'] = array(
-    '#type'  => 'submit',
-    '#value' => t('Add user'),
-    '#submit' => array('book_access_ui_user_add_submit'),
-  );
-
-  $form['submit'] = array(
-    '#type'  => 'submit',
-    '#value' => t('Save configuration'),
-  );
 
   return $form;
 }
@@ -226,9 +203,12 @@ function book_access_ui_grants_form($form_state, $node) {
  * @see book_access_ui_grants_form()
  */
 function book_access_ui_user_add_submit($form, &$form_state) {
-  $username = $form_state['values']['user']['username'];
+  $bool = (
+    ($username = trim($form_state['values']['user']['username'])) &&
+    ($user = user_load_by_name($username))
+  );
 
-  if ($user = user_load_by_name($username)) {
+  if ($bool) {
     $grants = array();
     $uid = $user->uid;
     $grants['grant_view'][$uid] = $form_state['values']['user']['grant_view'];
@@ -241,7 +221,7 @@ function book_access_ui_user_add_submit($form, &$form_state) {
     BookAccess::addUserGrants($form['#bid'], array($uid), $grants);
     _book_access_ui_permissions_warning();
   }
-  else {
+  elseif ($username) {
     drupal_set_message(t("User %user has not been found.", array('%user' => $username)), 'error');
   }
 }
@@ -280,23 +260,17 @@ function book_access_ui_grants_form_submit($form, &$form_state) {
  * @see book_access_ui_user_permissions_remove_submit()
  * @ingroup forms
  */
-function book_access_ui_user_permissions_remove($form_state, $node, $user) {
-  $form = array(
-    '#bid' => $node->book['bid'],
-    '#uid' => $user->uid,
-  );
+function book_access_ui_user_permissions_remove($form, $form_state, $node, $user) {
+  $form['#bid'] = $node->book['bid'];
+  $form['#uid'] = $user->uid;
 
-  if ($top_node = node_load($node->book['bid'])) {
-    $title = $top_node->title;
-  }
-  else {
-    $title = '#' . $node->book['bid'];
-  }
+  $top_node = node_load($form['#bid']);
+  $title = $top_node ? $top_node->title : ('#' . $node->book['bid']);
 
   return confirm_form(
     $form,
     t('Are you sure you want to remove the user %user permissions for the book %title?', array('%user' => $user->name, '%title' => $title)),
-    'node/' . $node->book['bid'] . '/book_access',
+    'node/' . $form['#bid'] . '/book_access',
      t('This action cannot be undone.'), t('Remove')
   );
 }
@@ -401,7 +375,8 @@ function theme_book_access_ui_grants_form($variables) {
     t('Operations'),
   );
 
-  return theme('table', $header, $rows) . drupal_render_children($form);
+  return theme('table', array('header' => $header, 'rows' => $rows)) .
+    drupal_render_children($form);
 }
 
 /**
@@ -437,7 +412,9 @@ function theme_book_access_ui_settings($variables) {
     $rows[] = $row;
   }
 
-  return drupal_render($form['info']) . theme('table', $header, $rows) . drupal_render_children($form);
+  return drupal_render($form['info']) .
+    theme('table', array('header' => $header, 'rows' => $rows)) .
+    drupal_render_children($form);
 }
 
 /**
@@ -455,10 +432,11 @@ function _book_access_ui_rebuild_batch_operation($bid, &$context) {
     $context['sandbox']['progress'] = 0;
   }
 
-  $result = db_select('book')
-    ->condition('nid', $context['sandbox']['current_node'], '>')
-    ->condition('bid', $bid)
-    ->orderBy('nid')
+  $result = db_select('book', 'b')
+    ->fields('b', array('bid', 'nid'))
+    ->condition('b.nid', $context['sandbox']['current_node'], '>')
+    ->condition('b.bid', $bid)
+    ->orderBy('b.nid')
     ->range(0, 20)
     ->execute();
 
@@ -469,7 +447,7 @@ function _book_access_ui_rebuild_batch_operation($bid, &$context) {
     }
 
     $context['sandbox']['progress']++;
-    $context['sandbox']['current_node'] = $row['nid'];
+    $context['sandbox']['current_node'] = $row->nid;
   }
 
   if ($context['sandbox']['progress'] != $context['sandbox']['max']) {

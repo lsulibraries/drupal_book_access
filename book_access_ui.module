@@ -54,9 +54,8 @@ function book_access_ui_form_book_admin_settings_alter(&$form, &$form_state) {
   );
 
   $form['book_access_settings']['info'] = array(
-    '#value' => '<em>' . t('These are the default values for authors, roles, and users access. Third-party modules can alter these values on a per book basis.') . '</em>',
+    '#markup' => '<em>' . t('These are the default values for authors, roles, and users access. Third-party modules can alter these values on a per book basis.') . '</em>',
   );
-
   $form['book_access_settings']['grants']['book_access_default_authors_access'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Default authors access'),

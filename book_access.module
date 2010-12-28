@@ -707,14 +707,15 @@ function book_access_form_alter(&$form, &$form_state, $form_id) {
  * permission.
  */
 function book_access_node_view_alter(&$build) {
-  $links = $build['links']['#links'];
-  $node = $build['#node'];
+  if (!empty($node->book['bid']) && !empty($build['links']['book']['#links'])) {
+    $links = $build['links']['book']['#links'];
+    $node = $build['#node'];
 
-  if (user_access('administer nodes')) {
-    return;
-  }
+    if (user_access('administer nodes')) {
+      return;
+    }
 
-  if (!empty($node->book['bid']) && !empty($links['book_add_child'])) {
+    if (!empty($links['book_add_child'])) {
     $vars = new BookAccessVars();
 
     $bool = (
@@ -733,6 +734,7 @@ function book_access_node_view_alter(&$build) {
     if (!$bool) {
       unset($links['book_add_child']);
     }
+  }
   }
 }
 
