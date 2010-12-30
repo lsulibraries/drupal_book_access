@@ -4,6 +4,4 @@ description = User interface for the Book access module.
 package = Access control
 core = 7.x
 dependencies[] = book_access
-files[] = book_access_ui.module
-files[] = book_access_ui.admin.inc
 configure = admin/content/book/settings
