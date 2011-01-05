@@ -7,7 +7,7 @@ class BookAccessRuleTestCase extends DrupalWebTestCase {
   public static function getInfo() {
     return array(
       'name' => 'Book access rule test',
-      'description' => 'Create a book, add pages, and test the rule access functionality.',
+      'description' => 'Create a book, add pages, and test the access functionality.',
       'group' => 'Book access',
     );
   }
@@ -190,59 +190,6 @@ class BookAccessRuleTestCase extends DrupalWebTestCase {
     }
 
     $this->drupalLogout();
-  }
-}
-
-class BookAccessUserTestCase extends DrupalWebTestCase {
-  protected $author;
-
-  public static function getInfo() {
-    return array(
-      'name' => 'Book access user test',
-      'description' => 'Create a book, add pages, and test the user access functionality.',
-      'group' => 'Book access',
-    );
-  }
-
-  function setUp() {
-    parent::setUp('book', 'vars', 'book_access');
-
-    $this->author = $this->drupalCreateUser(array(
-      'administer access of own books', 'add content to books', 'create book content',
-      'create new books', 'edit own book content', 'access content')
-    );
-  }
-
-  /**
-   * Creates a new book with a page hierarchy.
-   */
-  protected function createBook(&$books, &$nodes, $pages = 2) {
-    $this->drupalLogin($this->author);
-
-    $books[] = $book = $this->createBookNode('new');
-
-    while ($pages--) {
-      $nodes[] = $this->createBookNode($book->nid);
-    }
-
-    $this->drupalLogout();
-  }
-
- /**
-   * Creates a book node.
-   *
-   * @param $bid
-   *   The book ID, or 'new' to create new book.
-   * @param $parent
-   *   Parent book ID.
-   */
-  protected function createBookNode($bid) {
-    $settings = array('type' => 'book',
-      'title' => $this->randomName(10) . ' - book access test node: ' . $this->randomName(10),
-      'body' => 'Book access test body ' . $this->randomName(32) . ' (' . $this->randomName(32) .').',
-      'book' => array('bid' => $bid)
-    );
-    return $this->drupalCreateNode($settings);
   }
 
   function testUserAccess() {

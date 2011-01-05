@@ -1,4 +1,5 @@
 ; $Id$
+
 name = Book access UI
 description = User interface for the Book access module.
 package = Access control
