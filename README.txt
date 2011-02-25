@@ -1,4 +1,3 @@
-# $Id$
 #
 
 Module author: Harry Slaughter (http://drupal.org/user/28233)
