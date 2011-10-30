@@ -13,7 +13,7 @@ function book_access_ui_admin_paths() {
   $paths = array();
   $vars = new BookAccessVars();
 
-  if ($vars['node_admin_theme']) {
+  if (variable_get('node_admin_theme', TRUE)) {
     $paths['node/*/book_access'] = TRUE;
   }
 
@@ -58,21 +58,21 @@ function book_access_ui_form_book_admin_settings_alter(&$form, &$form_state) {
   $form['book_access_settings']['grants']['book_access_default_authors_access'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Default authors access'),
-    '#default_value' => $vars['book_access_default_authors_access'],
+    '#default_value' => variable_get('book_access_default_authors_access', array()),
     '#options' => $options,
   );
 
   $form['book_access_settings']['grants']['book_access_default_roles_access'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Default roles access'),
-    '#default_value' => $vars['book_access_default_roles_access'],
+    '#default_value' => variable_get('book_access_default_roles_access', array()),
     '#options' => $options,
   );
 
   $form['book_access_settings']['grants']['book_access_default_users_access'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Default users access'),
-    '#default_value' => $vars['book_access_default_users_access'],
+    '#default_value' => variable_get('book_access_default_users_access', array()),
     '#options' => $options,
   );
 

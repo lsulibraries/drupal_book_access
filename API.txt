@@ -1,6 +1,3 @@
-# This files reports the API changes, and in which versions has been done.
-#
-
 VERSION 2.2
 -----------
 

@@ -28,7 +28,7 @@ function book_access_ui_grants_form($form, &$form_state, $node) {
     $vars = new BookAccessVars();
 
     // Build the role access permissions for the book.
-    $grants = BookAccess::getAuthorGrants($bid, $node->uid, $vars['book_access_default_roles_access']);
+    $grants = BookAccess::getAuthorGrants($bid, $node->uid, variable_get('book_access_default_roles_access', array()));
     $grants_copy = $grants;
 
     drupal_alter('book_access_author_grants', $grants, $context);
@@ -75,7 +75,7 @@ function book_access_ui_grants_form($form, &$form_state, $node) {
       '#default_value' => !empty($grants['grant_edit_outline']),
     );
 
-    $grants = BookAccess::getRoleGrants($bid, $roles, $vars['book_access_default_roles_access']);
+    $grants = BookAccess::getRoleGrants($bid, $roles, variable_get('book_access_default_roles_access', array()));
     $grants_copy = $grants;
     drupal_alter('book_access_roles_grants', $roles, $grants, $context);
 
@@ -156,7 +156,7 @@ function book_access_ui_grants_form($form, &$form_state, $node) {
       '#autocomplete_path' => 'user/autocomplete',
     );
 
-    $grants = array_filter($vars['book_access_default_users_access']);
+    $grants = array_filter(variable_get('book_access_default_users_access', array()));
 
     $form['user']['grant_view'] = array(
       '#type' => 'checkbox',

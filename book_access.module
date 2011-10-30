@@ -9,6 +9,11 @@
 
 final class BookAccess {
   /**
+   * The minimum API version with which the module is compatible.
+   */
+  const API_COMPATIBLE_VERSION = '2.5';
+
+  /**
    * The API version implemented by the module.
    */
   const API_VERSION = '2.5';
@@ -117,7 +122,8 @@ final class BookAccess {
    * arguments.
    *
    * @param $minimum
-   *   The minimum API version required.
+   *   The minimum API version required. If the parameter is not passed, the
+   *   method will use the constant API_COMPATIBLE_VERSION.
    * @param $maximum
    *   The maximum version required. This argument is optional; the current API
    *   will be checked against this value only if it is passed to the function.
@@ -125,7 +131,11 @@ final class BookAccess {
    * @return
    *   TRUE, if the current API version is included between the passed values.
    */
-  public static function api($minimum, $maximum = NULL) {
+  public static function api($minimum = NULL, $maximum = NULL) {
+    if (!isset($minimum)) {
+      $minimum = self::API_COMPATIBLE_VERSION;
+    }
+    
     if (version_compare(self::API_VERSION, $minimum, '<')) {
       return FALSE;
     }
@@ -644,29 +654,6 @@ final class BookAccess {
 }
 
 /**
- * Allows to access the Drupal variables used by the module.
- */
-class BookAccessVars extends Vars {
-  /**
-   * Constructs a BookAccessVars object.
-   */
-  public function __construct() {
-   parent::__construct('book_access');
-  }
-
-  /**
-   * Implements Vars::getDefaults().
-   */
-  protected function getDefaults() {
-    return array(
-      'book_access_default_authors_access' => array('value' => array()),
-      'book_access_default_roles_access' => array('value' => array()),
-      'book_access_default_users_access' => array('value' => array()),
-    );
-  }
-}
-
-/**
  * Implements hook_form_alter().
  *
  * @see book_outline_form()
@@ -768,7 +755,7 @@ function book_access_node_view_alter(&$build) {
           ) ||
           user_access('administer book outlines')
         ) &&
-        node_access('create', $vars['book_child_type']) &&
+        node_access('create', variable_get('book_child_type', 'book')) &&
         ($node->status == 1) &&
         ($node->book['depth'] < MENU_MAX_DEPTH)
       );

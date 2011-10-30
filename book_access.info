@@ -4,6 +4,5 @@ description = Allows setting the access control for book nodes on a per book bas
 package = Access control
 core = 7.x
 dependencies[] = book
-dependencies[] = vars (2.x)
 files[] = book_access.module
 files[] = book_access.test

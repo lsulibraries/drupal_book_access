@@ -12,7 +12,7 @@ class BookAccessRuleTestCase extends DrupalWebTestCase {
   }
 
   function setUp() {
-    parent::setUp('book', 'vars', 'book_access');
+    parent::setUp('book', 'book_access');
 
     $this->author = $this->drupalCreateUser(array(
       'administer access of own books', 'add content to books', 'create book content',
