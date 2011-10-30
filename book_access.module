@@ -19,11 +19,6 @@ final class BookAccess {
   const API_VERSION = '2.5';
 
   /**
-   * The default priority used by the access grants implemented by the module.
-   */
-  const GRANT_PRIORITY =  0;
-
-  /**
    * Adds author grants to book pages.
    *
    * @param $bid
@@ -377,7 +372,7 @@ final class BookAccess {
           'grant_view' => $grant->grant_view,
           'grant_update' => $grant->grant_update,
           'grant_delete' => $grant->grant_delete,
-          'priority' => self::GRANT_PRIORITY,
+          'priority' => variable_get('book_access_priority', 0),
         );
       }
     }
@@ -745,8 +740,6 @@ function book_access_node_view_alter(&$build) {
     }
 
     if (!empty($links['book_add_child'])) {
-      $vars = new BookAccessVars();
-
       $bool = (
         (
           (

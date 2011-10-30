@@ -544,6 +544,7 @@ function book_access_uninstall() {
     'book_access_default_authors_access',
     'book_access_default_roles_access',
     'book_access_default_users_access',
+    'book_access_priority',
   );
   
   foreach ($variables as $variable) {

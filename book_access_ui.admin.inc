@@ -25,8 +25,6 @@ function book_access_ui_grants_form($form, &$form_state, $node) {
       '#uids' => array(),
       '#tree' => TRUE,
     );
-    $vars = new BookAccessVars();
-
     // Build the role access permissions for the book.
     $grants = BookAccess::getAuthorGrants($bid, $node->uid, variable_get('book_access_default_roles_access', array()));
     $grants_copy = $grants;
