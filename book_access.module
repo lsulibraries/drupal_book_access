@@ -148,7 +148,8 @@ final class BookAccess {
    * @param $bid
    *   The ID of the book to check.
    * @param $grant
-   *   The permission to check for.d
+   *   The permission to check for.  Can either be in the form "grant_update" or
+   *   "update" though the former is now preferred for consistency.
    * @param $account
    *   The user account for which the permission is checked; if it is not passed,
    *   the permission is checked against the current logged in user.
@@ -159,6 +160,10 @@ final class BookAccess {
   public static function checkGrant($bid, $grant, $account = NULL) {
     if (!isset($account)) {
       $account = $GLOBALS['user'];
+    }
+
+    if (preg_match( '/^grant_/', $grant)) {
+      $grant = preg_replace( '/^grant_/', '', $grant);
     }
 
     $roles = array_keys($account->roles);
@@ -715,13 +720,6 @@ function book_access_node_grants($account, $op) {
   $grants['book_access_user'] = array($account->uid);
 
   return $grants;
-}
-
-/**
- * Implements hook_node_update().
- */
-function book_access_node_update($node) {
-  BookAccess::deleteGrants($node->nid);
 }
 
 /**

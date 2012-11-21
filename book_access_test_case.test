@@ -67,11 +67,15 @@ class BookAccessTestCase extends DrupalWebTestCase {
     }
   }
 
-  function testRunCases() {
+  function testCases() {
+    // module-level permissions
     $this->caseNoSpecialBookAccess();
     $this->caseAdministerBookAccess();
     $this->caseAdministerAnyBookAccess();
     $this->caseAdministerOwnBookAccess();
+
+    // grants
+    $this->caseUpdatePreservesGrants();
   }
 
   private function caseNoSpecialBookAccess() {
@@ -171,6 +175,49 @@ class BookAccessTestCase extends DrupalWebTestCase {
     }
 
     $this->drupalLogout();
+  }
+
+  private function caseUpdatePreservesGrants() {
+    $user = $this->drupalCreateUser( array(
+      'access content',
+    ));
+
+    $grants = array(
+      'grant_update' => array( $user->uid => 1),
+      'grant_delete' => array( $user->uid => 1),
+      'grant_admin_access' => array( $user->uid => 1),
+      'grant_add_child' => array( $user->uid => 1),
+      'grant_edit_outline' => array( $user->uid => 1),
+    );
+
+    // precondition checks
+    foreach ($grants as $grant => $data) {
+      $this->assertFalse(
+        BookAccess::checkGrant( $this->books[0]->nid, $grant, $user),
+        t('Sanity check of initial state for "@grant" failed; should be false',
+          array( '@grant' => $grant)));
+    }
+
+    BookAccess::addUserGrants( $this->books[0]->nid, array( $user->uid), $grants);
+
+    // make sure initial add worked
+    foreach ($grants as $grant => $data) {
+      $this->assertTrue(
+        BookAccess::checkGrant( $this->books[0]->nid, $grant, $user),
+        t('Sanity check of "@grant" failed; should be true',
+          array( '@grant' => $grant)));
+    }
+
+    // update the node
+    module_invoke( 'book_access', 'node_update', $this->books[0]);
+
+    // post-test checks
+    foreach ($grants as $grant => $data) {
+      $this->assertTrue(
+        BookAccess::checkGrant( $this->books[0]->nid, $grant, $user),
+        t('"@grant" should stay true after node update',
+          array( '@grant' => $grant)));
+    }
   }
 }
 ?>
