@@ -1,0 +1,176 @@
+<?php
+
+class BookAccessTestCase extends DrupalWebTestCase {
+  protected $profile = 'testing';
+  protected $books;
+  protected $nodes;
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Book Access tester',
+      'description' => 'Unit test cases for book access module.',
+      'group' => 'Book access',
+    );
+  }
+
+  function setUp() {
+    parent::setUp('book', 'book_access', 'book_access_ui');
+
+    $this->resetTestData();
+  }
+
+  protected function resetTestData() {
+    $this->author = $this->drupalCreateUser( array(
+      'administer access of own books',
+      'add content to books',
+      'create book content',
+      'create new books',
+      'edit own book content',
+      'access content',
+    ));
+
+    $this->books = array();
+    $this->nodes = array();
+    $this->createBook( $this->books, $this->nodes, $this->author);
+  }
+
+  /*
+   * Creates books programmatically instead of by faking a form submit
+   * since it's much, much faster
+   */
+  protected function createBook(&$books, &$nodes, $author, $pages = 2) {
+    static $mlid = 1;
+    static $counter = 1;
+
+    $firstNode = NULL;
+    while ($pages--) {
+      $node = new stdClass();
+      $node->title = "top-level book page #$counter";
+      $node->body = "dummy content $counter";
+      $node->uid = $author->uid;
+      $node->type = 'page';
+      $node->status = 1;
+      if ($firstNode === NULL) {
+        $node->book['bid'] = 'new';
+      }
+      else {
+        $node->book['bid'] = $firstNode;
+      }
+      node_save( $node);
+
+      if ($firstNode === NULL) {
+        $books[] = $node;
+        $firstNode = $node->nid;
+      }
+      $nodes[] = $node;
+      ++$counter;
+    }
+  }
+
+  function testRunCases() {
+    $this->caseNoSpecialBookAccess();
+    $this->caseAdministerBookAccess();
+    $this->caseAdministerAnyBookAccess();
+    $this->caseAdministerOwnBookAccess();
+  }
+
+  private function caseNoSpecialBookAccess() {
+    $user = $this->drupalCreateUser( array(
+      'access content',
+    ));
+
+    $this->drupalLogin( $user);
+
+    foreach ($this->nodes as $node) {
+      $nid = $node->nid;
+      $this->drupalGet( "node/$nid");
+      $this->assertResponse( '200', t('Can access content'));
+
+      $this->drupalGet( "book_access/delete/user_permission/$nid/{$this->author->uid}");
+      $this->assertResponse( '403', t('Cannot modify book_access permissions'));
+
+      $this->drupalGet( "node/$nid/book_access");
+      $this->assertResponse( '403', t('Cannot change book access'));
+    }
+
+    $this->drupalLogout();
+  }
+
+  private function caseAdministerBookAccess() {
+    $user = $this->drupalCreateUser( array(
+      'administer book access',
+      'access content',
+    ));
+    $this->drupalLogin( $user);
+
+    foreach ($this->nodes as $node) {
+      $nid = $node->nid;
+      $this->drupalGet( "node/$nid");
+      $this->assertResponse( '200', t('Can access content'));
+
+      $this->drupalGet( "book_access/delete/user_permission/$nid/{$this->author->uid}");
+      $this->assertResponse( '200', t('Can modify book_access permissions'));
+
+      $this->drupalGet( "node/$nid/book_access");
+      $this->assertResponse( '200', t('Can change book access'));
+    }
+
+    $this->drupalLogout();
+  }
+
+  private function caseAdministerAnyBookAccess() {
+    $user = $this->drupalCreateUser( array(
+      'administer access of any book',
+      'access content',
+    ));
+    $this->drupalLogin( $user);
+
+    foreach ($this->nodes as $node) {
+      $nid = $node->nid;
+      $this->drupalGet( "node/$nid");
+      $this->assertResponse( '200', t('Can access content'));
+
+      $this->drupalGet( "book_access/delete/user_permission/$nid/{$this->author->uid}");
+      $this->assertResponse( '403', t('Cannot modify book_access permissions'));
+
+      $this->drupalGet( "node/$nid/book_access");
+      $this->assertResponse( '200', t('Can change book access'));
+    }
+
+    $this->drupalLogout();
+  }
+
+  private function caseAdministerOwnBookAccess() {
+    $user = $this->drupalCreateUser( array(
+      'administer access of own books',
+      'access content',
+    ));
+    $this->drupalLogin( $user);
+
+    $userBooks = array();
+    $userNodes = array();
+    $this->createBook( $userBooks, $userNodes, $user);
+
+    foreach ($this->nodes as $node) {
+      $nid = $node->nid;
+      $this->drupalGet( "node/$nid");
+      $this->assertResponse( '200', t('Can access content'));
+
+      $this->drupalGet( "book_access/delete/user_permission/$nid/{$this->author->uid}");
+      $this->assertResponse( '403', t('Cannot modify book_access permissions'));
+
+      $this->drupalGet( "node/$nid/book_access");
+      $this->assertResponse( '403', t('Cannot change book access'));
+    }
+
+    foreach ($userNodes as $node) {
+      $nid = $node->nid;
+
+      $this->drupalGet( "node/$nid/book_access");
+      $this->assertResponse( '200', t('Can change book access for own book'));
+    }
+
+    $this->drupalLogout();
+  }
+}
+?>
