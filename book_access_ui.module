@@ -185,7 +185,7 @@ function book_access_ui_grants_form_access($node) {
       return TRUE;
     }
 
-    if (user_access('administer access of any books')) {
+    if (user_access('administer access of any book')) {
       return TRUE;
     }
 
