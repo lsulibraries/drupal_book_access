@@ -130,7 +130,7 @@ final class BookAccess {
     if (!isset($minimum)) {
       $minimum = self::API_COMPATIBLE_VERSION;
     }
-    
+
     if (version_compare(self::API_VERSION, $minimum, '<')) {
       return FALSE;
     }
@@ -158,35 +158,86 @@ final class BookAccess {
    *   TRUE if the user has the permission, FALSE otherwise.
    */
   public static function checkGrant($bid, $grant, $account = NULL) {
+    static $queries = NULL;
+    if ($queries == NULL) {
+      $queries = array(
+        "book_access_author",
+        "book_access_role",
+        "book_access_user",
+      );
+    }
+
     if (!isset($account)) {
       $account = $GLOBALS['user'];
     }
 
-    if (preg_match( '/^grant_/', $grant)) {
-      $grant = preg_replace( '/^grant_/', '', $grant);
+    if (! preg_match( '/^grant_/', $grant)) {
+      $grant = "grant_$grant";
     }
 
     $roles = array_keys($account->roles);
-    $result = (
-      db_query_range(
-        "SELECT 1 FROM {book_access_author} WHERE nid = :nid AND uid = :uid AND grant_$grant > 0",
-        0, 1, array(':nid' => $bid, ':uid' => $account->uid)
-      )->fetchField() ||
-      db_query_range(
-        "SELECT 1 FROM {book_access_role} WHERE nid = :nid AND rid IN (:rid) AND grant_$grant > 0",
-          0, 1, array(':nid' => $bid, ':rid' => $roles)
-        )->fetchField() ||
-      db_query_range(
-          "SELECT 1 FROM {book_access_user} WHERE nid = :nid AND uid = :uid AND grant_$grant > 0",
-          0, 1, array(':nid' => $bid, ':uid' => $account->uid)
-        )->fetchField()
-    );
 
-    return $result;
+    $resultSets = array();
+    foreach ($queries as $table) {
+      $queryObj = db_select( $table, $table);
+      $queryObj
+        ->condition( "nid", $bid, "=");
+      if ($table == 'book_access_role') {
+        $queryObj->condition( "rid", $roles, "IN");
+      }
+      else {
+        $queryObj->condition( "uid", $account->uid, "=");
+      }
+      $queryObj
+        ->fields( $table, array( $grant))
+        ->range( 0, 1);
+      $resultSets[$table] = $queryObj->execute();
+    }
+
+    $rowCount = 0;
+    $grantCount = 0;
+    $explicitTables = array();
+    foreach ($resultSets as $table => $resultSet) {
+      if ($resultSet->rowCount() > 0) {
+        $row = $resultSet->fetchAssoc();
+        $explicitTables[$table] = TRUE;
+        ++$rowCount;
+        $grantCount += (int)$row[$grant];
+      }
+    }
+    $hasPermission = $grantCount > 0;
+
+    // if our row count is less than 3, that means taht we are missing an explicit
+    // permissions entry in one of the tables.  iterate and find the missing ones
+    // and check the defaults instead.
+    if (! $hasPermission && $rowCount < 3) {
+      $node = node_load( $bid);
+
+      // check default author permissions first
+      if (! isset($explicitTables['book_access_author'])) {
+        $authorDefaults = variable_get( "book_access_default_author_access");
+
+        $hasPermission = ($account->uid == $node->uid && in_array( $grant, $authorDefaults));
+      }
+
+      // then, failing that, check default role permissions
+      if (! $hasPermission && ! isset( $explicitTables['book_access_role'])) {
+        foreach ($roles as $role) {
+          $roleDefaults = variable_get( "book_access_default_role_{$role}_access");
+          $hasPermission = in_array( $grant, $roleDefaults);
+          if ($hasPermission) break;
+        }
+      }
+    }
+
+    return $hasPermission;
   }
 
   /**
-   * Deletes the book access grants from the database.
+   * Resets the book access grants from the database.
+   *
+   * NOTE: once a grant has been created, it is merely set to 0 to avoid using
+   * defaults.
    *
    * @param $value
    *   The value to look for.
@@ -196,7 +247,7 @@ final class BookAccess {
    * @param $types
    *   An array of grants types for which the function deletes records; the
    *   currently used values are 'author', 'role', 'user'. When this parameter
-   *   is not passed, the method
+   *   is not passed, the method cues off the $field setting.
    */
   public static function deleteGrants($value, $field = 'nid', array $types = NULL) {
     if (isset($types)) {
@@ -232,8 +283,15 @@ final class BookAccess {
     }
 
     foreach ($tables as $table) {
-      db_delete($table)
-        ->condition($field, $value)
+      db_update($table)
+        ->fields( array(
+          "grant_admin_access" => 0,
+          "grant_update" => 0,
+          "grant_delete" => 0,
+          "grant_add_child" => 0,
+          "grant_edit_outline" => 0,
+          "grant_view" => 0,
+        ))
         ->execute();
     }
   }
@@ -420,11 +478,26 @@ final class BookAccess {
     );
 
     // Build the role access permissions for the book.
-    foreach ($result as $access) {
-      unset($rcopy[$access->rid]);
+    if ($result->rowCount() > 0) {
+      foreach ($result as $access) {
+        unset($rcopy[$access->rid]);
 
-      foreach (self::grantIDs() as $id) {
-        $grants[$id][$access->rid] = !empty($access->$id);
+        foreach (self::grantIDs() as $id) {
+          $grants[$id][$access->rid] = !empty($access->$id);
+        }
+      }
+    }
+    else {
+      foreach ($rids as $rid) {
+        $roleDefaults = variable_get( "book_access_default_role_{$rid}_access");
+        if ($roleDefaults) {
+
+          unset($rcopy[$rid]);
+
+          foreach (self::grantIDs() as $id) {
+            $grants[$id][$rid] = in_array( $id, $roleDefaults);
+          }
+        }
       }
     }
 
@@ -492,6 +565,28 @@ final class BookAccess {
       'grant_view', 'grant_update', 'grant_delete',
       'grant_admin_access', 'grant_add_child', 'grant_edit_outline',
     );
+  }
+
+  /**
+   * Returns the default access permissions.
+   */
+  public static function defaultGrants() {
+    return array(
+      'grant_view',
+    );
+  }
+
+  /**
+   * Returns the default author access permissions.
+   */
+  public static function defaultAuthorGrants() {
+    static $defaults = NULL;
+    if (! $defaults) {
+      $defaults = self::grantIDs();
+      unset( $defaults[ array_search( 'grant_admin_access', $defaults)]);
+      $defaults = array_values( $defaults);
+    }
+    return $defaults;
   }
 
   /**
@@ -589,6 +684,40 @@ final class BookAccess {
   }
 
   /**
+   * @param $rid
+   *    The role id to set the default for.
+   * @param $rname
+   *    The optional name of the role.  If specified, this saves a database
+   *    trip, as otherwise this method uses $rid to look up the name.
+   *
+   * Based on the role name, this initializes the default grants for the role
+   * id.  This is only intended to be used during hook_init() or when creating a
+   * brand new role.
+   */
+  public static function setDefaultForRole($rid, $rname=NULL) {
+    if (! $rname) {
+      $role = user_role_load( $rid);
+      if ($role === FALSE) {
+        drupal_set_message( t("Could not set default book_access grants for role: @rid, role not found", array( '@rid' => $rid)), "error");
+        return;
+      }
+
+      $rname = $role->rid;
+    }
+
+    if ($rname == 'administrator') {
+      $defaultToUse = self::grantIDs();
+    }
+    else {
+      $defaultToUse = self::defaultGrants();
+    }
+
+    if (variable_get("book_access_default_role_{$rid}_access") == NULL) {
+      variable_set("book_access_default_role_{$rid}_access", $defaultToUse);
+    }
+  }
+
+  /**
    * Updates the grants for a book.
    *
    * @param $bid
@@ -650,6 +779,60 @@ final class BookAccess {
         }
       }
     }
+  }
+}
+
+/**
+ * Implements hook_init().
+ *
+ * Sets up some default variables.
+ */
+function book_access_init() {
+  $roles = user_roles();
+
+  $authorDefaults = BookAccess::defaultAuthorGrants();
+
+  if (variable_get('book_access_default_author_access') == NULL) {
+    variable_set('book_access_default_author_access', $authorDefaults);
+  }
+
+  foreach ($roles as $rid => $rname) {
+    BookAccess::setDefaultForRole( $rid, $rname);
+  }
+}
+
+/**
+ * Implements hook_user_role_insert().
+ *
+ * Makes sure to set default viewability when a new role is created.
+ */
+function book_access_user_role_insert( $role) {
+  BookAccess::setDefaultForRole( $role->rid, $role->name);
+}
+
+/**
+ * Implements hook_node_insert().
+ *
+ * Specifically targets creation of book nodes to set some default permissions
+ */
+function book_access_node_insert( $node) {
+  if ($node->book['bid']) {
+
+    BookAccess::setAuthorGrants(
+      $node->book['bid'],
+      $node->uid,
+      drupal_map_assoc( variable_get( "book_access_default_author_access")));
+
+    $user = user_load( $node->uid);
+    $roleGrants = array();
+    $rids = array_keys( $user->roles);
+    foreach ($rids as $rid) {
+      $roleDefaults = variable_get( "book_access_default_role_{$rid}_access", array());
+      foreach ($roleDefaults as $default) {
+        $roleGrants[$default][$rid] = TRUE;
+      }
+    }
+    BookAccess::setRoleGrants( $node->uid, $rids, $roleGrants);
   }
 }
 

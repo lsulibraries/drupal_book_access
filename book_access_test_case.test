@@ -5,6 +5,9 @@ class BookAccessTestCase extends DrupalWebTestCase {
   protected $books;
   protected $nodes;
 
+  private $author;
+  private $adminRole;
+
   public static function getInfo() {
     return array(
       'name' => 'Book Access tester',
@@ -28,6 +31,10 @@ class BookAccessTestCase extends DrupalWebTestCase {
       'edit own book content',
       'access content',
     ));
+    $this->adminRole = $this->drupalCreateRole( array(
+      'administer nodes',
+      'access content',
+    ), 'administrator');
 
     $this->books = array();
     $this->nodes = array();
@@ -76,6 +83,8 @@ class BookAccessTestCase extends DrupalWebTestCase {
 
     // grants
     $this->caseUpdatePreservesGrants();
+    $this->caseAuthorVsAdminDefaults();
+    $this->caseDefaultsPropagateToNewNode();
   }
 
   private function caseNoSpecialBookAccess() {
@@ -217,6 +226,109 @@ class BookAccessTestCase extends DrupalWebTestCase {
         BookAccess::checkGrant( $this->books[0]->nid, $grant, $user),
         t('"@grant" should stay true after node update',
           array( '@grant' => $grant)));
+    }
+  }
+
+  private function caseAuthorVsAdminDefaults() {
+    $adminRole = 0;
+    $adminGrantsToCheck = drupal_map_assoc( BookAccess::grantIDs());
+    $authorGrantsToCheck = drupal_map_assoc( BookAccess::grantIDs());
+    $authorGrantsToCheck['grant_admin_access'] = FALSE;
+
+    $user = $this->drupalCreateUser( array(
+      'access content',
+    ));
+
+    $userBooks = array();
+    $userNodes = array();
+    $this->createBook( $userBooks, $userNodes, $user);
+
+    foreach( $authorGrantsToCheck as $grant => $value) {
+      $this->assertEqual(
+        $value,
+        BookAccess::checkGrant(
+          $userBooks[0]->nid,
+          $grant,
+          $user),
+        t('Author should have @grant set to @value',
+          array(
+            '@grant' => $grant,
+            '@value' => $value ? "TRUE" : "FALSE",
+          ))
+        );
+    }
+
+    $adminRole = user_role_load_by_name( 'administrator');
+    if ($adminRole === FALSE) {
+      $this->fail( t('Couldn\'t load role \'administrator\''));
+    }
+    user_multiple_role_edit( array( $user->uid), 'add_role', $adminRole->rid);
+    $user = user_load( $user->uid);
+    foreach( $adminGrantsToCheck as $grant => $value) {
+      $this->assertEqual(
+        $value,
+        BookAccess::checkGrant(
+          $userBooks[0]->nid,
+          $grant,
+          $user),
+        t('Author should have @grant set to @value',
+          array(
+            '@grant' => $grant,
+            '@value' => $value ? "TRUE" : "FALSE",
+          ))
+        );
+    }
+  }
+
+  private function caseDefaultsPropagateToNewNode() {
+    $enabledGrants = array( 'grant_view', 'grant_update');
+
+    // precondition checks
+    $grantsToCheck = array(
+      'grant_delete' => FALSE,
+      'grant_view' => TRUE,
+    );
+
+    $rid = $this->drupalCreateRole( array(
+      'access content',
+    ));
+
+    if ($rid === FALSE) {
+      $this->fail( 'Couldn\'t create test role');
+    }
+
+    $roles = array();
+    $roleGrants = BookAccess::getRoleGrants($this->books[0], $roles);
+    foreach ($grantsToCheck as $grant => $value) {
+      $this->assertEqual( $value, $roleGrants[$grant][$rid],
+        t('Grant "@grant" should be @value',
+          array(
+            '@grant' => $grant,
+            '@value' => $value ? "true" : "false",
+          )
+        )
+      );
+    }
+
+    // change the default and create a new book
+    variable_set("book_access_default_role_{$rid}_access", $enabledGrants);
+
+    $roleBooks = array();
+    $roleNodes = array();
+    $roleUser = $this->drupalCreateUser();
+    user_multiple_role_edit( array( $roleUser->uid), 'add_role', $rid);
+
+    $this->createBook( $roleBooks, $roleNodes, $roleUser);
+
+    foreach ($enabledGrants as $grant) {
+      $this->assertTrue(
+        BookAccess::checkGrant( $roleBooks[0]->nid, $grant, $roleUser),
+        t('New book\'s grant "@grant" should be enabled',
+          array(
+            '@grant' => $grant,
+          )
+        )
+      );
     }
   }
 }
