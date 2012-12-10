@@ -712,7 +712,7 @@ final class BookAccess {
       $defaultToUse = self::defaultGrants();
     }
 
-    if (variable_get("book_access_default_role_{$rid}_access") == NULL) {
+    if (variable_get("book_access_default_role_{$rid}_access") === NULL) {
       variable_set("book_access_default_role_{$rid}_access", $defaultToUse);
     }
   }
@@ -792,7 +792,7 @@ function book_access_init() {
 
   $authorDefaults = BookAccess::defaultAuthorGrants();
 
-  if (variable_get('book_access_default_author_access') == NULL) {
+  if (variable_get('book_access_default_author_access') === NULL) {
     variable_set('book_access_default_author_access', $authorDefaults);
   }
 

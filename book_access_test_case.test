@@ -85,6 +85,7 @@ class BookAccessTestCase extends DrupalWebTestCase {
     $this->caseUpdatePreservesGrants();
     $this->caseAuthorVsAdminDefaults();
     $this->caseDefaultsPropagateToNewNode();
+    $this->caseRoleWithIntentionalNoPermissionsAvoidsDefault();
   }
 
   private function caseNoSpecialBookAccess() {
@@ -330,6 +331,39 @@ class BookAccessTestCase extends DrupalWebTestCase {
         )
       );
     }
+  }
+
+  private function caseRoleWithIntentionalNoPermissionsAvoidsDefault() {
+    $rid = $this->drupalCreateRole( array(
+      'access content',
+    ));
+
+    if ($rid === FALSE) {
+      $this->fail( 'Couldn\'t create test role');
+    }
+
+    $roleBooks = array();
+    $roleNodes = array();
+    $roleUser = $this->drupalCreateUser();
+    user_multiple_role_edit( array( $roleUser->uid), 'add_role', $rid);
+
+    $this->createBook( $roleBooks, $roleNodes, $roleUser);
+    $defaultRoleGrants = variable_get( "book_access_default_role_{$rid}_access");
+    $this->assertTrue(
+      in_array( 'grant_view', $defaultRoleGrants),
+      t('New book\'s grant_view should be on by default'));
+
+    variable_set( "book_access_default_role_{$rid}_access", array());
+    $defaultRoleGrants = variable_get( "book_access_default_role_{$rid}_access");
+    $this->assertFalse(
+      in_array( 'grant_view', $defaultRoleGrants),
+      t('Sanity check to make sure grant_view is gone.'));
+    module_invoke( 'book_access', 'init');
+
+    $defaultRoleGrants = variable_get( "book_access_default_role_{$rid}_access");
+    $this->assertFalse(
+      in_array( 'grant_view', $defaultRoleGrants),
+      t('grant_view should not have come back'));
   }
 }
 ?>
