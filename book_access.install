@@ -238,7 +238,7 @@ function book_access_install() {
 }
 
 /**
- * Update the existing tables.
+ * Update the existing tables from previous versions to match the new schema.
  */
 function book_access_update_7201() {
   $fields = array(
@@ -249,7 +249,7 @@ function book_access_update_7201() {
     'grant_add_child',
     'grant_edit_outline',
   );
-  $schema = array();
+  $schema = book_access_schema();
   $spec = array(
     'type' => 'int',
     'size' => 'tiny',
@@ -258,179 +258,6 @@ function book_access_update_7201() {
     'default' => 0,
   );
 
-  $schema['book_access_author'] = array(
-    'description' => 'Table for tracking book access by author.',
-    'fields' => array(
-      'nid' => array(
-        'description' => 'Primary key: The node ID of the book.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'uid' => array(
-        'description' => 'Primary key: The user ID of the book author.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_view' => array(
-        'description' => 'View book pages permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_update' => array(
-        'description' => 'Edit book pages permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_delete' => array(
-        'description' => 'Delete book pages permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_admin_access' => array(
-        'description' => 'Administer book access permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_add_child' => array(
-        'description' => 'Add child pages permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_edit_outline' => array(
-        'description' => 'Edit book outlines permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-    ),
-    'primary key' => array('nid', 'uid'),
-  );
-
-  $schema['book_access_role'] = array(
-    'description' => 'Table for tracking book access.',
-    'fields' => array(
-      'nid' => array(
-        'description' => 'Primary key: The node ID of the book.',
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'rid' => array(
-        'description' => 'Primary key: The role ID associated with a book node ID.',
-        'type' => 'int',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_view' => array(
-        'description' => 'View book pages permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_update' => array(
-        'description' => 'Edit book pages permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_delete' => array(
-        'description' => 'Delete book pages permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_admin_access' => array(
-        'description' => 'Administer book access permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_add_child' => array(
-        'description' => 'Add child pages permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_edit_outline' => array(
-        'description' => 'Edit book outlines permission.',
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-    ),
-    'primary key' => array('nid', 'rid'),
-  );
-
-  $schema['book_access_user'] = array(
-    'fields' => array(
-      'nid' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'uid' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_view' => array(
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_update' => array(
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-      'grant_delete' => array(
-        'type' => 'int',
-        'size' => 'tiny',
-        'unsigned' => TRUE,
-        'not null' => TRUE,
-        'default' => 0,
-      ),
-    ),
-    'primary key' => array('nid', 'uid'),
-  );
-  
   if (!db_table_exists('book_access_author')) {
     db_create_table('book_access_author', $schema['book_access_author']);
   }
@@ -456,7 +283,7 @@ function book_access_update_7201() {
         'default' => 0,
       )
     );
-    
+
     foreach ($fields as $field) {
       if (db_field_exists('book_access_role', $field)) {
         db_change_field('book_access_role', $field, $field, $spec);
@@ -466,9 +293,9 @@ function book_access_update_7201() {
       }
     }
 
-    db_add_primary_key('book_access_role', array('nid', 'uid'));
+    db_add_primary_key('book_access_role', array('nid', 'rid'));
   }
-  
+
   if (!db_table_exists('book_access_user')) {
     db_create_table('book_access_user', $schema['book_access_user']);
   }
@@ -494,7 +321,7 @@ function book_access_update_7201() {
 
     db_add_primary_key('book_access_user', array('nid', 'uid'));
   }
-  
+
   return $ret;
 }
 
@@ -517,13 +344,13 @@ function book_access_update_7203() {
     'update' => 'grant_update',
     'delete' => 'grant_delete',
   );
-  
+
   $variables = array(
     'book_access_default_authors_access',
     'book_access_default_roles_access',
     'book_access_default_users_access',
   );
-  
+
   foreach ($variables as $variable) {
     $value = variable_get($variable, NULL);
     foreach ($grants as $old_value => $new_value) {
@@ -546,7 +373,7 @@ function book_access_uninstall() {
     'book_access_default_users_access',
     'book_access_priority',
   );
-  
+
   foreach ($variables as $variable) {
     variable_del($variable);
   }
