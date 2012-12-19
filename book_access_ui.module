@@ -143,6 +143,15 @@ function book_access_ui_menu() {
     'file' => 'book_access_ui.admin.inc',
   );
 
+  // special admin-only to rebuild all book permissions
+  $items['book_access/rebuild_all'] = array(
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('book_access_ui_rebuild_all'),
+    'access arguments' => array('administer book access'),
+    'type' => MENU_CALLBACK,
+    'file' => 'book_access_ui.admin.inc',
+  );
+
   return $items;
 }
 

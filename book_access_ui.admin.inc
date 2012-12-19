@@ -289,6 +289,53 @@ function book_access_ui_user_permissions_remove_submit($form, &$form_state) {
 }
 
 /**
+ * Simple form handler to launch a rebuild-all pipeline.
+ */
+function book_access_ui_rebuild_all($form, &$form_state) {
+  $form['book_access_rebuild']['heading'] = array(
+    '#markup' => t('<h1>Rebuild all book access permissions</h1>'),
+  );
+
+  $form['book_access_rebuild']['content'] = array(
+    '#markup' => t('<p>This will rebuild <em>all</em> book permissions, refreshing node_access with values from book_access_author, book_access_role, book_access_user.</p><p><strong>Only</strong> do this if you have a very good reason to suspect that your node_access and book_access permissions are out of sync, as if you do this while there is a bug with your book_access permissions, you will propagate them to <em>all</em> books.</p>'),
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('I\'m sure, rebuild permissions!'),
+  );
+
+  return $form;
+}
+
+/**
+ * Form submissions handler for book_access_ui_rebuild_all().
+ *
+ * @see book_access_ui_rebuild_all()
+ */
+function book_access_ui_rebuild_all_submit($form, &$form_state) {
+  $allBids = array();
+  $resultSet =
+    db_select( 'book', 'book')
+    ->fields( 'book', array( 'bid'))
+    ->distinct()
+    ->execute();
+  while ($row = ($resultSet->fetchAssoc())) {
+    $allBids[] = $row['bid'];
+  }
+  $batch = array(
+    'title' => t('Rebuilding all book access permissions'),
+    'operations' => array(
+      array('_book_access_ui_rebuild_batch_operation', array($allBids)),
+    ),
+    'finished' => '_book_access_ui_rebuild_batch_finished',
+    'progress_message' => '',
+    'file' => drupal_get_path('module', 'book_access') . '/book_access_ui.admin.inc',
+  );
+  batch_set( $batch);
+}
+
+/**
  * Themes the permission tab added to each book.
  *
  * @param $variables
@@ -423,26 +470,39 @@ function _book_access_ui_permissions_warning() {
 }
 
 function _book_access_ui_rebuild_batch_operation($bid, &$context) {
+  if (! is_array( $bid)) {
+    $bid = array( $bid);
+  }
+
   if (empty($context['sandbox'])) {
     $context['sandbox']['current_node'] = 0;
-    $context['sandbox']['max'] = db_query('SELECT COUNT(DISTINCT nid) FROM {book} WHERE bid = :bid', array(':bid' => $bid))->fetchField();
+    $context['sandbox']['max'] = db_select('book', 'book')
+      ->condition('book.bid', $bid, 'IN')
+      ->fields('book', array('nid'))
+      ->distinct()
+      ->countQuery()
+      ->execute()
+      ->fetchField();
     $context['sandbox']['progress'] = 0;
   }
 
   $result = db_select('book', 'b')
     ->fields('b', array('bid', 'nid'))
     ->condition('b.nid', $context['sandbox']['current_node'], '>')
-    ->condition('b.bid', $bid)
+    ->condition('b.bid', $bid, 'IN')
     ->orderBy('b.nid')
+    ->distinct()
     ->range(0, 20)
     ->execute();
 
   foreach ($result as $row) {
     if ($node = node_load($row->nid, NULL, TRUE)) {
       node_access_acquire_grants($node);
-      $context['message'] = t('Rebuilding access permissions for %title', array('%title' => $node->title));
+      $list .= t('<li>%title</li>', array( '%title' => $node->title));
     }
 
+    $context['message'] = t('Rebuilding access permissions for:<ul>!list</ul>',
+      array('!list' => $list));
     $context['sandbox']['progress']++;
     $context['sandbox']['current_node'] = $row->nid;
   }

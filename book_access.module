@@ -1004,7 +1004,7 @@ function book_access_node_access_explain($row) {
  * If we have a book child page, we return the access settings of the top level
  * parent book page node.
  */
- function book_access_node_access_records($node) {
+function book_access_node_access_records($node) {
   $grants = array();
 
   if (!empty($node->book['bid'])) {
