@@ -224,11 +224,7 @@ final class BookAccess {
       // then, failing that, check default role permissions
       if (! $hasPermission && ! isset( $explicitTables['book_access_role'])) {
         foreach ($roles as $role) {
-          if ($role == 4) {
-          }
           $roleDefaults = variable_get( "book_access_default_role_{$role}_access");
-          if ($role == 4) {
-          }
           $hasPermission = in_array( $grant, $roleDefaults);
           if ($hasPermission) break;
         }
@@ -718,8 +714,6 @@ final class BookAccess {
     }
 
     if (variable_get("book_access_default_role_{$rid}_access") === NULL) {
-      if ($rid == 4 && function_exists( 'simpletest_verbose')) {
-      }
       variable_set("book_access_default_role_{$rid}_access", $defaultToUse);
     }
   }
