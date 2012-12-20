@@ -190,6 +190,7 @@ final class BookAccess {
       }
       $queryObj
         ->fields( $table, array( $grant))
+        ->orderBy( $grant, 'DESC') // for role-based queries, we want to enable where possible
         ->range( 0, 1);
       $resultSets[$table] = $queryObj->execute();
     }
@@ -223,7 +224,11 @@ final class BookAccess {
       // then, failing that, check default role permissions
       if (! $hasPermission && ! isset( $explicitTables['book_access_role'])) {
         foreach ($roles as $role) {
+          if ($role == 4) {
+          }
           $roleDefaults = variable_get( "book_access_default_role_{$role}_access");
+          if ($role == 4) {
+          }
           $hasPermission = in_array( $grant, $roleDefaults);
           if ($hasPermission) break;
         }
@@ -713,7 +718,30 @@ final class BookAccess {
     }
 
     if (variable_get("book_access_default_role_{$rid}_access") === NULL) {
+      if ($rid == 4 && function_exists( 'simpletest_verbose')) {
+      }
       variable_set("book_access_default_role_{$rid}_access", $defaultToUse);
+    }
+  }
+
+  /**
+   * Resets book permissions to its defaults, ignoring user-specific ones.
+   */
+  public static function resetToDefault($nid) {
+    $node = node_load( $nid);
+    $roles = user_roles();
+
+    $authorDefaults = variable_get('book_access_default_author_access');
+    BookAccess::setAuthorGrants(
+      $nid,
+      $node->uid,
+      drupal_map_assoc( $authorDefaults));
+
+    foreach ($roles as $rid => $rname) {
+      $roleDefaults = variable_get("book_access_default_role_{$rid}_access");
+      if ($roleDefaults !== NULL) {
+        BookAccess::setRoleGrants( $nid, array( $rid), $roleDefaults);
+      }
     }
   }
 
@@ -823,16 +851,15 @@ function book_access_node_insert( $node) {
       $node->uid,
       drupal_map_assoc( variable_get( "book_access_default_author_access")));
 
-    $user = user_load( $node->uid);
-    $roleGrants = array();
-    $rids = array_keys( $user->roles);
+    $roles = user_roles();
+    $rids = array_keys( $roles);
     foreach ($rids as $rid) {
       $roleDefaults = variable_get( "book_access_default_role_{$rid}_access", array());
       foreach ($roleDefaults as $default) {
         $roleGrants[$default][$rid] = TRUE;
       }
     }
-    BookAccess::setRoleGrants( $node->uid, $rids, $roleGrants);
+    BookAccess::setRoleGrants( $node->book['bid'], $rids, $roleGrants);
   }
 }
 

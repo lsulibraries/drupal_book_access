@@ -36,6 +36,9 @@ class BookAccessTestCase extends DrupalWebTestCase {
       'access content',
     ), 'administrator');
 
+    // invoke the initialization manually
+    module_invoke( 'book_access', 'init');
+
     $this->books = array();
     $this->nodes = array();
     $this->createBook( $this->books, $this->nodes, $this->author);
@@ -86,6 +89,8 @@ class BookAccessTestCase extends DrupalWebTestCase {
     $this->caseAuthorVsAdminDefaults();
     $this->caseDefaultsPropagateToNewNode();
     $this->caseRoleWithIntentionalNoPermissionsAvoidsDefault();
+
+    $this->caseResetToDefaults();
   }
 
   private function caseNoSpecialBookAccess() {
@@ -231,7 +236,6 @@ class BookAccessTestCase extends DrupalWebTestCase {
   }
 
   private function caseAuthorVsAdminDefaults() {
-    $adminRole = 0;
     $adminGrantsToCheck = drupal_map_assoc( BookAccess::grantIDs());
     $authorGrantsToCheck = drupal_map_assoc( BookAccess::grantIDs());
     $authorGrantsToCheck['grant_admin_access'] = FALSE;
@@ -251,7 +255,7 @@ class BookAccessTestCase extends DrupalWebTestCase {
           $userBooks[0]->nid,
           $grant,
           $user),
-        t('Author should have @grant set to @value',
+        t('Author (no admin role) should have @grant set to @value',
           array(
             '@grant' => $grant,
             '@value' => $value ? "TRUE" : "FALSE",
@@ -272,7 +276,7 @@ class BookAccessTestCase extends DrupalWebTestCase {
           $userBooks[0]->nid,
           $grant,
           $user),
-        t('Author should have @grant set to @value',
+        t('Author (with admin role) should have @grant set to @value',
           array(
             '@grant' => $grant,
             '@value' => $value ? "TRUE" : "FALSE",
@@ -293,7 +297,6 @@ class BookAccessTestCase extends DrupalWebTestCase {
     $rid = $this->drupalCreateRole( array(
       'access content',
     ));
-
     if ($rid === FALSE) {
       $this->fail( 'Couldn\'t create test role');
     }
@@ -364,6 +367,60 @@ class BookAccessTestCase extends DrupalWebTestCase {
     $this->assertFalse(
       in_array( 'grant_view', $defaultRoleGrants),
       t('grant_view should not have come back'));
+  }
+
+  private function caseResetToDefaults() {
+    // grants that will be set to true
+    // after a default reset
+    $grantsToCheck = array(
+      'grant_delete',
+      'grant_view',
+      'grant_update',
+    );
+
+    // set up user/role
+    $rid = $this->drupalCreateRole( array( 'access content',));
+    if ($rid === FALSE) {
+      $this->fail( 'Couldn\'t create test role');
+    }
+    $roleBooks = array();
+    $roleNodes = array();
+    $roleUser = $this->drupalCreateUser();
+    foreach ($roleUser->roles as $rid => $rname) {
+      user_multiple_role_edit( array( $roleUser->uid), 'remove_role', $rid);
+    }
+    user_multiple_role_edit( array( $roleUser->uid), 'add_role', $rid);
+    $roleUser = user_load( $roleUser->uid);
+
+    // clear defaults
+    variable_set( "book_access_default_role_{$rid}_access", array());
+
+    // create with a different author, check defaults
+    $this->createBook( $roleBooks, $roleNodes, $this->author);
+    foreach( $grantsToCheck as $grant) {
+      $this->assertFalse(
+        BookAccess::checkGrant( $roleBooks[0]->nid, $grant, $roleUser),
+        t('New book\'s grant "@grant" should be disabled',
+          array(
+            '@grant' => $grant,
+          )
+        )
+      );
+    }
+
+    // change defaults
+    variable_set( "book_access_default_role_{$rid}_access", $grantsToCheck);
+    BookAccess::resetToDefault( $roleBooks[0]->nid);
+    foreach( $grantsToCheck as $grant) {
+      $this->assertTrue(
+        BookAccess::checkGrant( $roleBooks[0]->nid, $grant, $roleUser),
+        t('New book\'s grant "@grant" should be reset to the new default of enabled',
+          array(
+            '@grant' => $grant,
+          )
+        )
+      );
+    }
   }
 }
 ?>
