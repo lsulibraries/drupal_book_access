@@ -195,6 +195,62 @@ function book_access_ui_grants_form($form, &$form_state, $node) {
 }
 
 /**
+ * Simple form handler to reset all book access to defaults.
+ */
+function book_access_ui_reset_all_to_defaults($form, &$form_state) {
+  $form['destination'] = array(
+    '#type' => 'hidden',
+    '#value' => drupal_get_destination(),
+  );
+
+  $form['book_access_rebuild']['heading'] = array(
+    '#markup' => t('<h1>Reset all to default</h1>'),
+  );
+
+  $form['book_access_rebuild']['content'] = array(
+    '#markup' => t('<p>This will reset <em>all</em> book permissions to their defaults.  This will leave user-specific permissions alone, but otherwise everything will get clobbered.</p><p>Be very sure this is what you want to do, this is irreversible!</p>'),
+  );
+
+  $form['return'] = array(
+    '#markup' => t('<p><a href=\'/admin/content/book/settings\'>Never mind, go back!</a></p>'),
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('I\'m sure, reset all (non-user-specific) book permissions to their defaults!'),
+  );
+
+  return $form;
+}
+
+/**
+ * Form submissions callback for book_access_ui_reset_all_to_defaults().
+ *
+ * @see book_access_ui_reset_all_to_defaults()
+ */
+function book_access_ui_reset_all_to_defaults_submit($form, &$form_state) {
+  $allBids = array();
+  $resultSet =
+    db_select( 'book', 'book')
+    ->fields( 'book', array( 'bid'))
+    ->distinct()
+    ->execute();
+  while ($row = ($resultSet->fetchAssoc())) {
+    $allBids[] = $row['bid'];
+  }
+  $batch = array(
+    'title' => t('Resetting all book access permissions'),
+    'operations' => array(
+      array('_book_access_ui_reset_batch_operation', array($allBids)),
+    ),
+    'finished' => '_book_access_ui_reset_batch_finished',
+    'progress_message' => '',
+    'file' => drupal_get_path('module', 'book_access') . '/book_access_ui.admin.inc',
+  );
+  batch_set( $batch);
+}
+
+/**
  * Form submission callback for book_access_ui_grants_form().
  *
  * @see book_access_ui_grants_form()
@@ -300,6 +356,10 @@ function book_access_ui_rebuild_all($form, &$form_state) {
     '#markup' => t('<p>This will rebuild <em>all</em> book permissions, refreshing node_access with values from book_access_author, book_access_role, book_access_user.</p><p><strong>Only</strong> do this if you have a very good reason to suspect that your node_access and book_access permissions are out of sync, as if you do this while there is a bug with your book_access permissions, you will propagate them to <em>all</em> books.</p>'),
   );
 
+  $form['return'] = array(
+    '#markup' => t('<p><a href=\'/admin/content/book/settings\'>Never mind, go back!</a></p>'),
+  );
+
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('I\'m sure, rebuild permissions!'),
@@ -333,6 +393,60 @@ function book_access_ui_rebuild_all_submit($form, &$form_state) {
     'file' => drupal_get_path('module', 'book_access') . '/book_access_ui.admin.inc',
   );
   batch_set( $batch);
+}
+
+function _book_access_ui_reset_batch_operation($bid, &$context) {
+  if (! is_array( $bid)) {
+    $bid = array( $bid);
+  }
+
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['current_node'] = 0;
+    $context['sandbox']['max'] = db_select('book', 'book')
+      ->condition('book.bid', $bid, 'IN')
+      ->fields('book', array('nid'))
+      ->distinct()
+      ->countQuery()
+      ->execute()
+      ->fetchField();
+    $context['sandbox']['progress'] = 0;
+  }
+
+  $result = db_select('book', 'b')
+    ->fields('b', array('bid', 'nid'))
+    ->condition('b.nid', $context['sandbox']['current_node'], '>')
+    ->condition('b.bid', $bid, 'IN')
+    ->orderBy('b.nid')
+    ->distinct()
+    ->range(0, 20)
+    ->execute();
+
+  foreach ($result as $row) {
+    $node = node_load( $row->nid);
+    BookAccess::resetToDefault( $row->nid);
+    $list .= t('<li>%title</li>', array( '%title' => $node->title));
+
+    $context['sandbox']['progress']++;
+    $context['sandbox']['current_node'] = $row->nid;
+  }
+  $context['message'] = t('Resetting permissions for:<ul>!list</ul>',
+    array('!list' => $list));
+
+  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+}
+
+function _book_access_ui_reset_batch_finished($success, $results, $operations) {
+  if ($success) {
+    drupal_set_message(t('Book permissions have been reset to their defaults.'));
+    drupal_set_message(t('You will need to <a href=\'/book_access/rebuild_all\'>rebuild all permissions</a> to propagate the reset.'));
+    node_access_needs_rebuild(FALSE);
+  }
+  else {
+    drupal_set_message(t('Book access permissions have not been properly reset (uh oh).'), 'error');
+  }
+  cache_clear_all();
 }
 
 /**
@@ -501,11 +615,11 @@ function _book_access_ui_rebuild_batch_operation($bid, &$context) {
       $list .= t('<li>%title</li>', array( '%title' => $node->title));
     }
 
-    $context['message'] = t('Rebuilding access permissions for:<ul>!list</ul>',
-      array('!list' => $list));
     $context['sandbox']['progress']++;
     $context['sandbox']['current_node'] = $row->nid;
   }
+  $context['message'] = t('Rebuilding access permissions for:<ul>!list</ul>',
+    array('!list' => $list));
 
   if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
     $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];

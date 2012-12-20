@@ -266,7 +266,7 @@ function book_access_update_7201() {
     if (db_table_exists('book_access')) {
       @db_drop_primary_key('book_access');
       db_rename_table('book_access', 'book_access_role');
-      db_add_primary_key('book_access_role', array('nid', 'uid'));
+      db_add_primary_key('book_access_role', array('nid', 'rid'));
     }
     else {
       db_create_table('book_access_role', $schema['book_access_role']);

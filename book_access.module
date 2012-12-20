@@ -731,12 +731,17 @@ final class BookAccess {
       $node->uid,
       drupal_map_assoc( $authorDefaults));
 
+    // clear out the existing role grants and add on to it
+    BookAccess::setRoleGrants( $nid, array_keys( $roles), array());
+    $roleGrantsToAdd = array();
     foreach ($roles as $rid => $rname) {
       $roleDefaults = variable_get("book_access_default_role_{$rid}_access");
-      if ($roleDefaults !== NULL) {
-        BookAccess::setRoleGrants( $nid, array( $rid), $roleDefaults);
+      foreach ($roleDefaults as $grant) {
+        $roleGrantsToAdd[$grant][$rid] = TRUE;
       }
     }
+
+    BookAccess::addRoleGrants( $nid, array_keys( $roles), $roleGrantsToAdd);
   }
 
   /**
