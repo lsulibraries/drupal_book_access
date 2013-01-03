@@ -1054,7 +1054,7 @@ function book_access_node_access_explain($row) {
     }
   }
   elseif ($row->realm == 'book_access_user') {
-    if ($user = user_load(array('uid' => $row->gid))) {
+    if ($user = user_load( $row->gid)) {
       $result = array(
         t('Grants for user %username',
           array('%username' => $user->name)
