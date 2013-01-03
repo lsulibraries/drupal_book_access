@@ -93,6 +93,7 @@ class BookAccessTestCase extends DrupalWebTestCase {
     $this->caseAuthorDefaultsPropagateToUpdatedNode();
     $this->caseRoleWithIntentionalNoPermissionsAvoidsDefault();
 
+    $this->caseDeletingBookDoesNotDeleteGrants();
     $this->caseResetToDefaults();
   }
 
@@ -448,6 +449,25 @@ class BookAccessTestCase extends DrupalWebTestCase {
     $this->assertFalse(
       in_array( 'grant_view', $defaultRoleGrants),
       t('grant_view should not have come back'));
+  }
+
+  private function caseDeletingBookDoesNotDeleteGrants() {
+    $roleBooks = array();
+    $roleNodes = array();
+    $this->createBook( $roleBooks, $roleNodes, $this->author);
+
+    $this->assertTrue(
+      BookAccess::checkGrant( $roleBooks[0]->nid, 'grant_view', $this->author),
+      t('Sanity checking that newly-created book has grant_view'));
+    $this->assertTrue(
+      BookAccess::checkGrant( $this->books[0]->nid, 'grant_view', $this->author),
+      t('Sanity checking that base test-case book has grant_view'));
+
+    node_delete( $roleBooks[0]->nid);
+
+    $this->assertTrue(
+      BookAccess::checkGrant( $this->books[0]->nid, 'grant_view', $this->author),
+      t('Base test-case book should maintain its permissions'));
   }
 
   private function caseResetToDefaults() {

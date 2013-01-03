@@ -293,6 +293,7 @@ final class BookAccess {
           "grant_edit_outline" => 0,
           "grant_view" => 0,
         ))
+        ->condition( $field == "bid" ? "nid" : $field, $value, '=')
         ->execute();
     }
   }
