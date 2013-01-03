@@ -843,8 +843,7 @@ function book_access_user_role_insert( $role) {
  * Specifically targets creation of book nodes to set some default permissions
  */
 function book_access_node_insert( $node) {
-  if ($node->book['bid']) {
-
+  if (isset( $node->book['bid']) && $node->book['bid']) {
     BookAccess::setAuthorGrants(
       $node->book['bid'],
       $node->uid,
@@ -859,6 +858,57 @@ function book_access_node_insert( $node) {
       }
     }
     BookAccess::setRoleGrants( $node->book['bid'], $rids, $roleGrants);
+  }
+}
+
+/**
+ * Implements hook_node_update().
+ *
+ * Makes sure defaults propagate to pages that have been 'upgraded' to a book.
+ */
+function book_access_node_update( $node) {
+  if (isset( $node->book['bid']) && $node->book['bid']) {
+    // check for existing permissions
+    $rowCount = db_select( 'book_access_author', 'book_access_author')
+      ->condition( 'nid', $node->book['bid'], '=')
+      ->condition( 'uid', $node->uid)
+      ->countQuery()
+      ->execute()
+      ->fetchField();
+    if ($rowCount == 0) {
+      BookAccess::setAuthorGrants(
+        $node->book['bid'],
+        $node->uid,
+        drupal_map_assoc( variable_get( "book_access_default_author_access")));
+    }
+
+    $roles = user_roles();
+    $rids = array_keys( $roles);
+    $roleResultSet = db_select( 'book_access_role', 'book_access_role')
+      ->condition( 'nid', $node->book['bid'], '=')
+      ->condition( 'rid', $rids, 'IN')
+      ->fields( 'book_access_role', array( 'rid'))
+      ->distinct()
+      ->execute();
+    if ($roleResultSet->rowCount() < count( $rids)) {
+      // fill in the missing ones
+      $existingRids = array();
+      foreach ($roleResultSet as $row) {
+        $existingRids[] = $row->rid;
+      }
+
+      $missingRids = array_diff( $rids, $existingRids);
+      foreach ($missingRids as $rid) {
+        $defaultToUse = variable_get( "book_access_role_{$rid}_default");
+        if ($defaultToUse !== NULL) {
+          $roleDefaults = array();
+          foreach ($defaultToUse as $grant) {
+            $roleDefaults[$grant] = $rid;
+          }
+          BookAccess::addRoleGrants( $node->book['bid'], array($rid), $roleDefaults);
+        }
+      }
+    }
   }
 }
 

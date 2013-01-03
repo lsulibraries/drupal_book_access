@@ -87,7 +87,10 @@ class BookAccessTestCase extends DrupalWebTestCase {
     // grants
     $this->caseUpdatePreservesGrants();
     $this->caseAuthorVsAdminDefaults();
-    $this->caseDefaultsPropagateToNewNode();
+    $this->caseAuthorDefaultsPropagateToNewNode();
+    $this->caseRoleDefaultsPropagateToNewNode();
+
+    $this->caseAuthorDefaultsPropagateToUpdatedNode();
     $this->caseRoleWithIntentionalNoPermissionsAvoidsDefault();
 
     $this->caseResetToDefaults();
@@ -285,7 +288,56 @@ class BookAccessTestCase extends DrupalWebTestCase {
     }
   }
 
-  private function caseDefaultsPropagateToNewNode() {
+  private function caseAuthorDefaultsPropagateToNewNode() {
+    $originalDefaults = variable_get( "book_access_default_author_access");
+
+    $newDefaults = array( 'grant_view', 'grant_delete');
+    variable_set( "book_access_default_author_access", $newDefaults);
+
+    $userBooks = array();
+    $userNodes = array();
+    $this->createBook( $userBooks, $userNodes, $this->author);
+
+    // verify that our db data is correct, too
+    $resultSet= db_select('book_access_author', 'book_access_author')
+      ->condition( 'uid', $this->author->uid, '=')
+      ->condition( 'nid', $userBooks[0]->nid, '=')
+      ->fields( 'book_access_author')
+      ->execute();
+    $this->assertTrue( $resultSet->rowCount() == 1,
+      t('Exactly one entry in the database'));
+    $row = $resultSet->fetchAssoc();
+
+    foreach ($originalDefaults as $grant) {
+      if (in_array( $grant, $newDefaults)) {
+        $this->assertTrue(
+          BookAccess::checkGrant( $userBooks[0]->nid, $grant, $this->author),
+          t('New author default for grant "@grant" should be TRUE',
+            array( '@grant' => $grant)));
+        $this->assertEqual( 1, $row[$grant],
+          t('DB entry for node @nid, author @uid, grant "@grant" should be 1',
+            array( '@nid' => $userBooks[0]->nid,
+              '@uid' => $this->author->uid,
+              '@grant' => $grant)));
+      }
+      else {
+        $this->assertFalse(
+          BookAccess::checkGrant( $userBooks[0]->nid, $grant, $this->author),
+          t('New author default for grant "@grant" should be FALSE',
+            array( '@grant' => $grant)));
+        $this->assertEqual( 0, $row[$grant],
+          t('DB entry for node @nid, author @uid, grant "@grant" should be 0',
+            array( '@nid' => $userBooks[0]->nid,
+              '@uid' => $this->author->uid,
+              '@grant' => $grant)));
+      }
+    }
+
+
+    variable_set( "book_access_default_author_access", $originalDefaults);
+  }
+
+  private function caseRoleDefaultsPropagateToNewNode() {
     $enabledGrants = array( 'grant_view', 'grant_update');
 
     // precondition checks
@@ -334,6 +386,35 @@ class BookAccessTestCase extends DrupalWebTestCase {
         )
       );
     }
+  }
+
+  private function caseAuthorDefaultsPropagateToUpdatedNode() {
+    $newNode = new stdClass();
+    $newNode->title = "un-booked node";
+    $newNode->body = "dummy content";
+    $newNode->uid = $this->author->uid;
+    $newNode->type = 'page';
+    $newNode->stats = 1;
+    node_save( $newNode);
+
+    $query = db_select( 'book_access_author', 'book_access_author')
+      ->condition( 'nid', $newNode, '=')
+      ->condition( 'uid', $this->author->uid)
+      ->fields( 'book_access_author');
+    $resultSet = $query->execute();
+    $this->assertEqual( 0, $resultSet->rowCount(),
+      t('There should not be any entry in the book_access_author table'));
+
+    // upgrade the node to a book
+    $newNode->book['bid'] = 'new';
+    node_save( $newNode);
+    $query = db_select( 'book_access_author', 'book_access_author')
+      ->condition( 'nid', $newNode->book['bid'], '=')
+      ->condition( 'uid', $this->author->uid, '=')
+      ->fields( 'book_access_author');
+    $resultSet = $query->execute();
+    $this->assertEqual( 1, $resultSet->rowCount(),
+      t('There should be an entry in the book_access_author table post-update'));
   }
 
   private function caseRoleWithIntentionalNoPermissionsAvoidsDefault() {
