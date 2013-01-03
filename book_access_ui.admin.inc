@@ -438,9 +438,11 @@ function _book_access_ui_reset_batch_operation($bid, &$context) {
 }
 
 function _book_access_ui_reset_batch_finished($success, $results, $operations) {
+  global $base_url;
+
   if ($success) {
     drupal_set_message(t('Book permissions have been reset to their defaults.'));
-    drupal_set_message(t('You will need to <a href=\'/book_access/rebuild_all\'>rebuild all permissions</a> to propagate the reset.'));
+    drupal_set_message(t('You will need to <a href=\'!base/book_access/rebuild_all\'>rebuild all permissions</a> to propagate the reset.', array('!base' => $base_url)));
     node_access_needs_rebuild(FALSE);
   }
   else {
