@@ -364,17 +364,24 @@ function book_access_update_7203() {
 }
 
 /**
+ * Get rid of variables no longer being used.
+ */
+function book_access_update_7204() {
+  variable_del( 'book_access_default_roles_access');
+  variable_del( 'book_access_default_users_access');
+}
+
+/**
  * Implements hook_uninstall().
  */
 function book_access_uninstall() {
-  $variables = array(
-    'book_access_default_authors_access',
-    'book_access_default_roles_access',
-    'book_access_default_users_access',
-    'book_access_priority',
-  );
-
+  $roles = user_roles();
+  $variables = array();
+  $variables[] = 'book_access_default_authors_access';
+  foreach ($roles as $rid => $rname) {
+    $variables[] = "book_access_default_role_{$rid}_access";
+  }
   foreach ($variables as $variable) {
-    variable_del($variable);
+    variable_del( $variable);
   }
 }
