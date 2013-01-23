@@ -185,13 +185,43 @@ function book_access_ui_grants_form($form, &$form_state, $node) {
       '#value' => t('Add user'),
       '#submit' => array('book_access_ui_user_add_submit'),
     );
+
     $form['submit'] = array(
       '#type'  => 'submit',
       '#value' => t('Save configuration'),
     );
+
+    // the ability to reset just this book to defaults
+    $form['reset'] = array(
+      '#type' => 'submit',
+      '#value' => t('Reset to defaults'),
+      '#submit' => array('book_access_ui_reset_one_to_defaults_submit'),
+    );
+
   }
 
   return $form;
+}
+
+/**
+ * Form submissions callback for to reset one book node's defaults.
+ *
+ * @see book_access_ui_grants_form_access()
+ */
+function book_access_ui_reset_one_to_defaults_submit($form, &$form_state) {
+  $bid = $form['#bid'];
+  BookAccess::resetToDefault( $bid);
+
+  // rebuild permissions
+  $node = node_load( $bid, NULL, TRUE);
+  if ($node) {
+    node_access_acquire_grants( $node);
+  }
+  else {
+    drupal_set_message( "Could not rebuild permissions for this book", "error");
+  }
+
+  cache_clear_all();
 }
 
 /**
