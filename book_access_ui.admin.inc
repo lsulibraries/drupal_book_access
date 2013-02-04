@@ -451,6 +451,7 @@ function _book_access_ui_reset_batch_operation($bid, &$context) {
     ->range(0, 20)
     ->execute();
 
+  $list = '';
   foreach ($result as $row) {
     $node = node_load( $row->nid);
     BookAccess::resetToDefault( $row->nid);
@@ -641,6 +642,7 @@ function _book_access_ui_rebuild_batch_operation($bid, &$context) {
     ->range(0, 20)
     ->execute();
 
+  $list = '';
   foreach ($result as $row) {
     if ($node = node_load($row->nid, NULL, TRUE)) {
       node_access_acquire_grants($node);
