@@ -844,7 +844,9 @@ function book_access_user_role_insert( $role) {
  * Specifically targets creation of book nodes to set some default permissions
  */
 function book_access_node_insert( $node) {
-  if (isset( $node->book['bid']) && $node->book['bid']) {
+  if (isset( $node->book['bid'])
+      && $node->book['bid']
+      && $node->nid == $node->book['bid']) {
     BookAccess::setAuthorGrants(
       $node->book['bid'],
       $node->uid,

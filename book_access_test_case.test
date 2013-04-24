@@ -89,6 +89,7 @@ class BookAccessTestCase extends DrupalWebTestCase {
     $this->caseAuthorVsAdminDefaults();
     $this->caseAuthorDefaultsPropagateToNewNode();
     $this->caseRoleDefaultsPropagateToNewNode();
+    $this->caseChildDefaultsDoNotAffectParentBook();
 
     $this->caseAuthorDefaultsPropagateToUpdatedNode();
     $this->caseRoleWithIntentionalNoPermissionsAvoidsDefault();
@@ -387,6 +388,37 @@ class BookAccessTestCase extends DrupalWebTestCase {
         )
       );
     }
+  }
+
+  private function caseChildDefaultsDoNotAffectParentBook() {
+    $originalDefaults = variable_get( "book_access_default_author_access");
+
+    $userBooks = array();
+    $userNodes = array();
+    $this->createBook( $userBooks, $userNodes, $this->author);
+
+    $this->assertTrue(
+      BookAccess::checkGrant( $userBooks[0]->nid, 'grant_delete', $this->author),
+      t('Sanity checking that parent book does have grant_delete'));
+
+    // now change our defaults for creating a child node
+    $newDefaults = array( 'grant_view');
+    variable_set("book_access_default_author_access", $newDefaults);
+
+    $newNode = new stdClass();
+    $newNode->title = "child node";
+    $newNode->body = "dummy content";
+    $newNode->uid = $this->author->uid;
+    $newNode->type = 'page';
+    $newNode->stats = 1;
+    $newNode->book['bid'] = $userBooks[0]->nid;
+    node_save( $newNode);
+
+    $this->assertTrue(
+      BookAccess::checkGrant( $userBooks[0]->nid, 'grant_delete', $this->author),
+      t('Parent must remain un-changed in its permissions'));
+
+    variable_set( "book_access_default_author_access", $originalDefaults);
   }
 
   private function caseAuthorDefaultsPropagateToUpdatedNode() {
