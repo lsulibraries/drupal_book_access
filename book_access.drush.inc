@@ -1,7 +1,7 @@
 <?php
 
 function book_access_drush_command(){
-    module_load_include('module', 'book_access', 'book_access');
+    require_once(DRUPAL_ROOT.'/sites/all/modules/book_access/book_access.module');
     $grant_options = implode(',', array_map('strip_grant', BookAccess::grantIDs()));
     $items['book-access-set-role-grants'] = array(
         'description' => 'Set grants for roles on a given book.',
@@ -20,6 +20,7 @@ function book_access_drush_command(){
             ),
         ),
         'aliases' => array('ba-srg'),
+        'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_FULL, // No bootstrap at all.
     );
     return $items;
 }
@@ -32,7 +33,7 @@ function drush_book_access_set_role_grants(){
     $title  = drush_get_option('title');
     $role   = drush_get_option('role');
     $grants = explode(',', drush_get_option('grants'));
-    
+
     module_load_include('module', 'book_access', 'book_access');
     $grants_allowed = array_map('strip_grant', BookAccess::grantIDs());
 
@@ -40,8 +41,10 @@ function drush_book_access_set_role_grants(){
         "select b.nid from node n join (select nid from book where nid = bid) b on n.nid = b.nid "
         . "where n.type = 'book' and n.title = :title;", 0, 1, array(':title' => $title))->fetchField();
 
-    $grants = array_map(
+    $grants = empty($grants) ? array() : array_map(
         function ($el) use ($grants_allowed) {
+            if($el === "") return;
+
             if(!in_array($el, $grants_allowed)) {
                 drush_set_error("\ngrant_$el is not a valid grant.");
                 exit(1);
@@ -64,9 +67,34 @@ function drush_book_access_set_role_grants(){
     foreach (BookAccess::grantIDs() as $id) {
       $row->$id = in_array($id, $grants);
     }
-    drupal_set_message(t('Before Write: RID:(%rid), Update? %up', array('%rid'=> $row->rid, '%up' => (int)$update)));
+    //drupal_set_message(t('Before Write: RID:(%rid), Update? %up', array('%rid'=> $row->rid, '%up' => (int)$update)));
 
-    drupal_write_record('book_access_role', $row, $update ? array('nid', 'rid') : array());
+    $success = drupal_write_record('book_access_role', $row, $update ? array('nid', 'rid') : array());
+
     drupal_set_message(t('Set Role grants; params: %t, %r, (%g)', array('%t'=> $title, '%r' => $role, '%g' => implode(',', $grants))));
-    drupal_set_message(t('Set Role grants; found bid = %b', array('%b'=> $bid)));
+    rebuild_all();
+    //drupal_set_message(t('Set Role grants; found bid = %b', array('%b'=> $bid)));
+}
+
+function rebuild_all(){
+    $allBids = array();
+    $resultSet =
+      db_select( 'book', 'book')
+      ->fields( 'book', array( 'bid'))
+      ->distinct()
+      ->execute();
+    while ($row = ($resultSet->fetchAssoc())) {
+      $allBids[] = $row['bid'];
+    }
+    $batch = array(
+      'title' => t('Rebuilding all book access permissions'),
+      'operations' => array(
+        array('_book_access_ui_rebuild_batch_operation', array($allBids)),
+      ),
+      'finished' => '_book_access_ui_rebuild_batch_finished',
+      'progress_message' => '',
+      'file' => drupal_get_path('module', 'book_access') . '/book_access_ui.admin.inc',
+    );
+    batch_set($batch);
+    drush_backend_batch_process();
 }
